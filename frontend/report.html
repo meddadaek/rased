@@ -36,6 +36,7 @@
     <div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">
       <button class="btn ghost" id="geoBtn" data-i18n="useMyLocation">استعمل موقعي</button>
       <span id="coords" style="font-size:11.5px;color:var(--txt-faint);align-self:center"></span>
+      <span id="routeInfo" class="routeinfo"></span>
     </div>
   </div>
 
@@ -74,8 +75,9 @@
 <script src="js/i18n.js?v=10"></script>
 <script src="js/basemap.js?v=10"></script>
 <script src="js/common.js?v=10"></script>
+<script src="js/routemap.js?v=10"></script>
 <script>
-let map = null, marker = null, ASSETS = null;
+let RM = null, ASSETS = null;
 let picked = null, kind = "smoke";
 
 const KINDS = [
@@ -85,118 +87,48 @@ const KINDS = [
   { v: "road",  i: "🚧", k: "kindRoad" },
 ];
 
-const R = 6371;
-function haversine(a, b, c, d) {
-  const p = Math.PI / 180;
-  const x = Math.sin((c - a) * p / 2) ** 2 +
-            Math.cos(a * p) * Math.cos(c * p) * Math.sin((d - b) * p / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(x));
-}
+const GROUPS = [
+  { key: "hospital",     icon: "🏥", labelKey: "hospitalKind" },
+  { key: "fire_station", icon: "🚒", labelKey: "stationKind" },
+  { key: "aid",          icon: "🤝", labelKey: "aidOrg" },
+];
 
-function nearestOf(kindKey, lat, lon, limit) {
+function nearestOf(kindKey, lat, lon) {
   const items = (ASSETS && ASSETS.assets[kindKey]) || [];
   return items
-    .map((x) => ({ ...x, km: haversine(lat, lon, x.lat, x.lon) }))
-    .sort((a, b) => a.km - b.km)
-    .slice(0, limit || 1);
+    .filter((x) => x.lat && x.lon)
+    .map((x) => ({ ...x, km: kmBetween(lat, lon, x.lat, x.lon) }))
+    .sort((a, b) => a.km - b.km)[0];
 }
 
-/* Real road geometry, not a straight line. In mountainous Kabylie the crow-flies
-   distance to a hospital is routinely half the real driving distance, and showing
-   the short number to someone deciding whether to move an injured person would be
-   actively dangerous. */
-async function route(fromLat, fromLon, toLat, toLon) {
-  const url = "https://router.project-osrm.org/route/v1/driving/" +
-    fromLon + "," + fromLat + ";" + toLon + "," + toLat +
-    "?overview=full&geometries=geojson";
-  try {
-    const r = await fetch(url);
-    const d = await r.json();
-    if (d.code !== "Ok" || !d.routes || !d.routes.length) return null;
-    return {
-      km: (d.routes[0].distance / 1000).toFixed(1),
-      min: Math.round(d.routes[0].duration / 60),
-      geometry: d.routes[0].geometry,
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-function drawRoute(geometry) {
-  const data = { type: "Feature", geometry, properties: {} };
-  if (map.getSource("route")) {
-    map.getSource("route").setData(data);
-    return;
-  }
-  map.addSource("route", { type: "geojson", data });
-  map.addLayer({
-    id: "route-glow", type: "line", source: "route",
-    layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": "#ff6b35", "line-width": 9, "line-opacity": 0.22, "line-blur": 3 },
-  });
-  map.addLayer({
-    id: "route-line", type: "line", source: "route",
-    layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": "#ff9668", "line-width": 3 },
-  });
-}
-
-async function showNearby(lat, lon) {
+function showNearby() {
   const L = T();
   const box = document.getElementById("nearby");
-  if (!ASSETS) { box.innerHTML = ""; return; }
+  if (!RM || !RM.here || !ASSETS) { box.innerHTML = ""; return; }
+  const here = RM.here;
 
-  const groups = [
-    { key: "hospital",     icon: "🏥", label: L.hospitalKind },
-    { key: "fire_station", icon: "🚒", label: L.stationKind },
-    { key: "aid",          icon: "🤝", label: L.aidOrg },
-  ];
+  box.innerHTML = '<div class="card"><h3>' + L.nearbyHelp + '</h3><div class="needlist">' +
+    GROUPS.map((g) => {
+      const hit = nearestOf(g.key, here.lat, here.lon);
+      if (!hit) return "";
+      return '<div class="need u-norm">' +
+        '<div class="need-h"><b>' + g.icon + " " + (hit.name || L.unnamed) + "</b></div>" +
+        '<div class="need-w">' + L[g.labelKey] + " · " + n(hit.km.toFixed(1)) + " " +
+          L.km + " " + L.direct + "</div>" +
+        '<div class="need-f"><span class="need-st"></span>' +
+          '<button class="btn ghost route" data-lat="' + hit.lat + '" data-lon="' + hit.lon +
+          '" data-i="' + g.icon + '" data-name="' + (hit.name || "").replace(/"/g, "&quot;") +
+          '">' + L.showRoute + "</button></div></div>";
+    }).join("") + "</div></div>";
 
-  box.innerHTML = '<div class="card"><h3>' + L.nearbyHelp + "</h3><div id=\"nbList\"></div></div>";
-  const list = document.getElementById("nbList");
-
-  for (const g of groups) {
-    const hit = nearestOf(g.key, lat, lon, 1)[0];
-    if (!hit) continue;
-    const id = "nb-" + g.key;
-    list.insertAdjacentHTML("beforeend",
-      '<div class="step" style="margin-bottom:8px">' +
-        '<span class="n">' + g.icon + "</span>" +
-        "<div style=\"flex:1\">" +
-          "<b>" + (hit.name || L.unnamed) + "</b>" +
-          "<p>" + g.label + " · " + n(hit.km.toFixed(1)) + " " + L.km + " " + L.direct +
-            ' <span id="' + id + '"></span></p>' +
-        "</div>" +
-        '<button class="btn ghost" style="padding:7px 12px;font-size:11.5px" data-route="' +
-          hit.lat + "," + hit.lon + '">' + L.showRoute + "</button>" +
-      "</div>");
-
-    // Fetch the road answer in the background; the straight-line figure is
-    // already on screen so the panel is useful before OSRM replies.
-    route(lat, lon, hit.lat, hit.lon).then((r) => {
-      const span = document.getElementById(id);
-      if (span && r) {
-        span.innerHTML = ' · <b style="color:var(--ember)">' + n(r.min) + " " + L.min +
-                         "</b> " + L.driveTime + " (" + n(r.km) + " " + L.km + ")";
+  document.querySelectorAll(".route").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const res = await RM.route({ lat: +b.dataset.lat, lon: +b.dataset.lon,
+                                   name: b.dataset.name, icon: b.dataset.i },
+                                 { min: L.min, km: L.km, by: L.driveTime });
+      if (res.error === "no-route") {
+        document.getElementById("routeInfo").textContent = L.noRoute;
       }
-    });
-  }
-
-  list.querySelectorAll("[data-route]").forEach((b) =>
-    b.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      const [dlat, dlon] = b.dataset.route.split(",").map(Number);
-      b.disabled = true;
-      const r = await route(lat, lon, dlat, dlon);
-      b.disabled = false;
-      if (!r) return;
-      drawRoute(r.geometry);
-      const cs = r.geometry.coordinates;
-      const lons = cs.map((c) => c[0]), lats = cs.map((c) => c[1]);
-      map.fitBounds([[Math.min(...lons), Math.min(...lats)],
-                     [Math.max(...lons), Math.max(...lats)]],
-                    { padding: 45, duration: 800 });
     }));
 }
 
@@ -204,14 +136,7 @@ function setPoint(lat, lon) {
   picked = { lat, lon };
   document.getElementById("coords").textContent = lat.toFixed(4) + ", " + lon.toFixed(4);
   document.getElementById("submit").disabled = false;
-
-  if (marker) marker.remove();
-  const el = document.createElement("div");
-  el.className = "fmark big";
-  el.innerHTML = '<div class="ring"></div><div class="core"></div>';
-  marker = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
-
-  showNearby(lat, lon);
+  showNearby();
 }
 
 function renderKinds() {
@@ -226,9 +151,10 @@ function renderKinds() {
 function redraw() {
   const L = T();
   document.title = L.reportPage + " · " + L.brand;
-  document.getElementById("mapHint").textContent = L.pickHint;
+  document.getElementById("geoBtn").textContent = L.useMyLocation;
+  if (RM) RM.hint(RM.here ? L.chooseDest : L.pickHint);
   renderKinds();
-  if (picked) showNearby(picked.lat, picked.lon);
+  showNearby();
 }
 
 document.getElementById("form").addEventListener("submit", async (e) => {
@@ -253,7 +179,6 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const d = await res.json();
-
     const sat = d.satellite;
     let msg = "<b>" + L.reportOk + "</b> #" + n(d.id);
     if (sat.confirmed && !sat.is_simulated) {
@@ -264,7 +189,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     out.innerHTML = '<div class="notice ok">' + msg + "</div>";
     document.getElementById("form").reset();
   } catch (err) {
-    // Static hosting has no API; say so plainly instead of showing a raw error.
+    // Static hosting has no API. Say so plainly rather than showing a raw error.
     out.innerHTML = '<div class="notice danger"><b>' + L.reportFail + "</b> — " +
       L.needServer + "</div>";
   } finally {
@@ -273,23 +198,23 @@ document.getElementById("form").addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("geoBtn").addEventListener("click", (e) => {
-  e.preventDefault();
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      setPoint(pos.coords.latitude, pos.coords.longitude);
-      map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 12 });
-    },
-    () => { /* denied or unavailable; the map click still works */ },
-    { enableHighAccuracy: true, timeout: 10000 });
-});
-
 (async function () {
   initPage({ redraw });
+
+  RM = createRouteMap({
+    container: "map", hintId: "mapHint", infoId: "routeInfo",
+    center: [4.5, 36.4], zoom: 5.4,
+    onLocate: (h) => setPoint(h.lat, h.lon),
+  });
+
+  document.getElementById("geoBtn").addEventListener("click", (e) => {
+    e.preventDefault();
+    RM.locateMe(() => RM.hint(T().locationDenied));
+  });
+
   redraw();
 
-  const style = await darkBasemapStyle();
+  const style = await basemapStyle();
   try {
     if (maplibregl.getRTLTextPluginStatus() === "unavailable") {
       await maplibregl.setRTLTextPlugin(
@@ -297,14 +222,12 @@ document.getElementById("geoBtn").addEventListener("click", (e) => {
     }
   } catch (e) { /* labels degrade, map still works */ }
 
-  map = new maplibregl.Map({
-    container: "map", style, center: [4.5, 36.4], zoom: 5.4,
-    attributionControl: false,
-  });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-  map.on("click", (e) => setPoint(e.lngLat.lat, e.lngLat.lng));
+  await RM.init(style);
+  // Tapping anywhere on the map is the primary way to place a report.
+  RM.map.on("click", (e) => setPoint(e.lngLat.lat, e.lngLat.lng));
 
   try { ASSETS = await loadAssets(); } catch (err) { ASSETS = null; }
+  redraw();
 })();
 </script>
 </body>

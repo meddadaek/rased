@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+# Publishes frontend/ as the live site. Runs on every push to main, which means
+# the scheduled data refresh (refresh-data.yml) republishes the site as a side
+# effect of committing new payloads — no separate trigger needed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race. A half-published fire map is worse than a slightly
+# stale one, so an in-flight deploy is allowed to finish rather than be killed.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sanity-check the payloads before publishing
+        run: |
+          set -e
+          for f in risk.json fires.json wilayas.geojson; do
+            test -s "frontend/data/$f" || { echo "missing or empty: $f"; exit 1; }
+          done
+          python3 - <<'PY'
+          import json, sys
+          fires = json.load(open("frontend/data/fires.json", encoding="utf-8"))
+          risk = json.load(open("frontend/data/risk.json", encoding="utf-8"))
+          # Refuse to publish simulated data to a public fire map. This is the
+          # one failure the project cannot afford, so it is a build gate rather
+          # than a convention.
+          if fires.get("source") == "MOCK":
+              sys.exit("fires.json is MOCK - refusing to publish")
+          if risk.get("source") == "MOCK":
+              sys.exit("risk.json is MOCK - refusing to publish")
+          veg = [f for f in fires["fires"] if f.get("category") != "industrial"]
+          print("source: %s | %d vegetation fires | %d burning now"
+                % (fires["source"], len(veg), sum(1 for f in veg if f.get("active"))))
+          print("risk:   %s | %d wilayas" % (risk["source"], len(risk["wilayas"])))
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,28 +1,25 @@
 /* ─── data source ─────────────────────────────────────────────────────────
    Where the generated payloads are fetched from.
 
-   Locally they sit next to the pages. In production they are read straight
-   from the public GitHub repository, which has a useful consequence: refreshing
-   the data is a `git push`, not a redeploy. The pipeline can run on a schedule
-   from anywhere and the live site picks it up, with nothing to rebuild.
+   Same origin, always. The payloads ship with the site — on GitHub Pages, on
+   Vercel, and from `python -m http.server` — so `data/` resolves everywhere
+   without a cross-origin request, a CDN dependency, or a CORS failure mode.
 
-   raw.githubusercontent rather than jsDelivr, deliberately. Both are free and
-   both send CORS headers, but jsDelivr caches a branch for 7 days at the edge
-   (s-maxage 12 h) while raw sends max-age=300. On a site whose headline number
-   is "fires burning in the last 6 hours", a twelve-hour-stale payload is not a
-   performance trade-off, it is a wrong answer.
+   An earlier version pulled these from raw.githubusercontent so that a data
+   refresh needed no redeploy. That property is now provided by the scheduled
+   GitHub Action instead: it runs the pipeline, commits the payloads, and the
+   deploy workflow republishes automatically. Same outcome, one less service in
+   the path between a person and a fire map.
+
+   DATA_BASE is deliberately a single constant rather than per-call logic: every
+   fetch in the app goes through dataURL(), so redirecting the whole site at a
+   mirror is a one-line change here if it is ever needed.
    ───────────────────────────────────────────────────────────────────────── */
 
-const DATA_REPO = "meddadaek/rased@main";
-const DATA_CDN = "https://raw.githubusercontent.com/" +
-  DATA_REPO.replace("@", "/") + "/frontend/data/";
+const DATA_BASE = "data/";
 
-const LOCAL_HOSTS = ["localhost", "127.0.0.1", ""];
-
-const DATA_BASE = LOCAL_HOSTS.includes(location.hostname) ? "data/" : DATA_CDN;
-
-/* Accepts either "risk.json" or "data/risk.json" so call sites can stay
-   readable either way. */
+/* Accepts either "risk.json" or "data/risk.json" so call sites stay readable
+   either way. */
 function dataURL(path) {
   return DATA_BASE + String(path).replace(/^data\//, "");
 }

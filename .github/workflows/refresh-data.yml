@@ -1,0 +1,89 @@
+name: Refresh fire and danger data
+
+# Keeps the published site current without anyone running anything by hand.
+#
+# Every three hours is chosen to match the data, not to look busy: VIIRS and
+# MODIS give roughly four usable passes over Algeria per day, and the danger
+# index is a daily forecast. Running more often would re-download the same
+# numbers and lean on free community services for nothing.
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      skip_routing:
+        description: "Skip OSRM road routing (much faster, drops drive times)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Satellite fire detections
+        env:
+          RASED_FIRMS_KEY: ${{ secrets.RASED_FIRMS_KEY }}
+        run: |
+          if [ -z "$RASED_FIRMS_KEY" ]; then
+            echo "::error::RASED_FIRMS_KEY is not set. Add it under"
+            echo "::error::Settings > Secrets and variables > Actions."
+            echo "::error::Get a free key (email only) at"
+            echo "::error::https://firms.modaps.eosdis.nasa.gov/api/map_key/"
+            exit 1
+          fi
+          python backend/app/firms.py --days 2
+
+      - name: Weather and fire-danger index
+        # Open-Meteo needs no key. This is the slower of the two fetches because
+        # it pulls 99 days per wilaya to spin the moisture codes up properly.
+        run: python backend/pipeline.py
+
+      - name: Exposure — who is near which fire
+        run: |
+          if [ "${{ inputs.skip_routing }}" = "true" ]; then
+            python backend/build_exposure.py --no-route
+          else
+            python backend/build_exposure.py
+          fi
+
+      - name: Verify before committing
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          fires = json.load(open("frontend/data/fires.json", encoding="utf-8"))
+          if fires.get("source") == "MOCK":
+              sys.exit("refusing to commit simulated fire data")
+          veg = [f for f in fires["fires"] if f.get("category") != "industrial"]
+          active = [f for f in veg if f.get("active")]
+          print("::notice::%d vegetation fires, %d burning within %sh, %d new"
+                % (len(veg), len(active), fires.get("active_hours", 6),
+                   sum(1 for f in active if f.get("is_new"))))
+          PY
+
+      - name: Commit refreshed payloads
+        run: |
+          git config user.name "rased-bot"
+          git config user.email "actions@github.com"
+          git add frontend/data backend/app/fire_history.json
+          if git diff --cached --quiet; then
+            echo "No change since the last run — nothing to commit."
+            exit 0
+          fi
+          # The fire history is committed alongside the payloads so that
+          # "this fire is new" stays answerable across runs on a fresh runner.
+          git commit -m "data: refresh fires and danger index [skip ci]"
+          git push
