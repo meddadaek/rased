@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الولايات · راصد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="css/style.css?v=10" rel="stylesheet">
+<link href="css/pages.css?v=10" rel="stylesheet">
+</head>
+<body>
+
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1 data-i18n="wilayasPage">الولايات الـ48</h1>
+    <p data-i18n="wilayasLede"></p>
+  </div>
+  <div class="notice" id="predBanner"></div>
+  <div id="content"><div class="loading">…</div></div>
+</div>
+
+<footer class="foot">
+  <span data-ar="الحدود: geoBoundaries (ODbL) · الطقس: Open-Meteo · المؤشر: Van Wagner 1987"
+        data-fr="Limites : geoBoundaries (ODbL) · Météo : Open-Meteo · Indice : Van Wagner 1987"></span>
+</footer>
+
+<script src="js/i18n.js?v=10"></script>
+<script src="js/common.js?v=10"></script>
+<script>
+let RISK = null, GEO = null, FIRES = null;
+
+function render() {
+  const PB = document.getElementById('predBanner');
+  if (PB) PB.innerHTML = '<b>' + T().predictedTitle + '</b> ' + T().predictedBody;
+  const L = T();
+  document.title = L.wilayasPage + " · " + L.brand;
+
+  const fireCount = {};
+  if (FIRES) FIRES.fires.forEach((f) => {
+    if (f.wilaya) fireCount[f.wilaya] = (fireCount[f.wilaya] || 0) + 1;
+  });
+
+  const rows = GEO.features.map((g) => {
+    const p = g.properties;
+    const w = RISK.wilayas[p.code];
+    const d = w ? w.days[0] : null;
+    return {
+      code: p.code,
+      name: wilayaName(p),
+      alt: isAr() ? p.name_fr : p.name_ar,
+      fuel: p.fuel,
+      fwi: d ? d.fwi : 0,
+      cls: d ? d.class : "very_low",
+      temp: d ? d.weather.temp : null,
+      rh: d ? d.weather.rh : null,
+      wind: d ? d.weather.wind : null,
+      fires: fireCount[p.code] || 0,
+    };
+  }).sort((a, b) => b.fwi - a.fwi);
+
+  const body = rows.map((r) =>
+    "<tr>" +
+      '<td><a href="wilaya.html?code=' + r.code + '"><b>' + r.name + "</b></a>" +
+        '<br><span style="font-size:10px;color:var(--txt-faint)">' + n(r.code) + " · " + r.alt + "</span></td>" +
+      "<td>" + classPill(r.cls) + "</td>" +
+      '<td class="num"><b style="color:' + CLASS_COLORS[r.cls] + '">' + n(r.fwi.toFixed(1)) + "</b></td>" +
+      '<td><span class="pill calm">' + L.fuel[r.fuel] + "</span></td>" +
+      '<td class="num">' + (r.temp !== null ? n(Math.round(r.temp)) + "°" : "—") + "</td>" +
+      '<td class="num">' + (r.rh !== null ? n(Math.round(r.rh)) + "%" : "—") + "</td>" +
+      '<td class="num">' + (r.wind !== null ? n(Math.round(r.wind)) : "—") + "</td>" +
+      '<td class="num">' + (r.fires ? '<span class="pill grow">' + n(r.fires) + "</span>" : "—") + "</td>" +
+    "</tr>").join("");
+
+  document.getElementById("content").innerHTML =
+    '<div class="tablewrap"><table class="data"><thead><tr>' +
+      "<th>" + L.colWilaya + "</th><th>" + L.colRisk + "</th><th>FWI</th>" +
+      "<th>" + L.colFuel + "</th><th>" + L.temp + "</th><th>" + L.rh + "</th>" +
+      "<th>" + L.wind + "</th><th>" + L.colFires + "</th>" +
+    "</tr></thead><tbody>" + body + "</tbody></table></div>";
+}
+
+(async function () {
+  initPage({ redraw: render });
+  try {
+    [RISK, GEO] = await Promise.all([loadRisk(), loadWilayaGeo()]);
+    try { FIRES = await loadFires(); } catch (e) { FIRES = null; }
+    render();
+  } catch (err) {
+    document.getElementById("content").innerHTML =
+      '<div class="notice danger">' + err.message + "</div>";
+  }
+})();
+</script>
+</body>
+</html>

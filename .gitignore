@@ -1,0 +1,25 @@
+# Secrets — the FIRMS key is free but it is still yours; never commit it.
+.env
+backend/.env
+
+# Local database of citizen reports (contains contact details)
+backend/rased.db
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Scratch
+caps.xml
+tile.*
+*.log
+exposure_run.log
+
+# Vercel
+.vercel/
+
+# fire_history.json IS committed on purpose: it is the baseline that makes
+# "this fire is new" answerable on the very first run after a deploy. It holds
+# only satellite coordinates and timestamps — public NASA data, nothing personal.

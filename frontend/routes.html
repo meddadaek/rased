@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دليل القوافل والطرق · راصد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet">
+<link href="css/style.css?v=10" rel="stylesheet">
+<link href="css/pages.css?v=10" rel="stylesheet">
+<link href="css/home.css?v=10" rel="stylesheet">
+</head>
+<body>
+
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1 data-ar="دليل القوافل والطرق" data-fr="Guide des convois et itinéraires"></h1>
+    <p data-ar="اختر نقطة انطلاق قافلتك ووجهتها، فيُحسب المسار على شبكة الطرق الحقيقية مع زمن الوصول، ويُنبَّه إذا كان المسار يمرّ قرب بؤرة مشتعلة."
+       data-fr="Choisissez le départ et la destination de votre convoi : l'itinéraire est calculé sur le réseau routier réel avec le temps de trajet, et vous êtes averti s'il passe près d'un foyer actif."></p>
+  </div>
+
+  <div class="notice danger">
+    <span data-ar="<b>لا تدخل منطقة حريق نشط بقافلة.</b> هذا الدليل يحسب المسافة والزمن، ولا يعرف ما إذا كان الطريق مقطوعًا الآن. اتصل بالحماية المدنية 14 أو بخلية التنسيق قبل التحرّك."
+          data-fr="<b>N'engagez jamais un convoi dans une zone de feu actif.</b> Cet outil calcule distance et durée ; il ne sait pas si une route est coupée à cet instant. Appelez la Protection civile au 14 ou la cellule de coordination avant de partir."></span>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="minimap" id="map" style="height:420px;border:0;border-radius:0">
+      <div class="minimap-hint" id="mapHint"></div>
+    </div>
+    <div class="maptools">
+      <button class="btn" id="geoBtn"></button>
+      <button class="btn ghost" id="pickBtn"></button>
+      <button class="btn ghost" id="clearBtn" hidden></button>
+      <span id="routeInfo" class="routeinfo"></span>
+    </div>
+  </div>
+  <p class="privacy" id="privacy" style="margin:-6px 0 18px"></p>
+
+  <div class="card">
+    <h3 data-ar="إلى أين تتّجه القافلة؟" data-fr="Où va le convoi ?"></h3>
+    <div class="toolbar" style="margin-bottom:12px">
+      <select class="wsel" id="destSel"></select>
+      <button class="btn" id="goBtn" data-ar="احسب المسار" data-fr="Calculer l'itinéraire"></button>
+    </div>
+    <div id="hazard"></div>
+  </div>
+
+  <div class="card">
+    <h3 data-ar="الوجهات ذات الأولوية" data-fr="Destinations prioritaires"></h3>
+    <p class="chart-note" id="prioNote" style="margin-bottom:12px"></p>
+    <div id="priority"><div class="loading">…</div></div>
+  </div>
+
+  <div class="card">
+    <h3 data-ar="قواعد ميدانية للقوافل" data-fr="Règles de terrain pour les convois"></h3>
+    <div class="prose">
+      <ul>
+        <li data-ar="<b>لا تعتمد على شاحنة كبيرة وحدها.</b> مسالك المشاتي الجبلية في جيجل وبجاية ضيقة ومنعطفاتها حادة؛ التوزيع الأخير يحتاج مركبات دفع رباعي أو شاحنات صغيرة محلية."
+            data-fr="<b>Ne comptez pas sur un seul gros camion.</b> Les pistes des hameaux de montagne à Jijel et Béjaïa sont étroites et en lacets ; le dernier kilomètre exige des 4x4 ou de petits camions locaux."></li>
+        <li data-ar="<b>مرّ عبر نقطة فرز، لا مباشرة إلى القرية.</b> القوافل التي تصل دون تنسيق تُكدّس نفس المواد في نفس المكان بينما تنتظر قرية أخرى. مراكز الاستقبال موجودة لهذا الغرض."
+            data-fr="<b>Passez par un point de tri, pas directement au village.</b> Les convois non coordonnés entassent les mêmes produits au même endroit pendant qu'un autre village attend. Les centres de réception existent pour cela."></li>
+        <li data-ar="<b>اتصل قبل التحميل لا بعده.</b> «الكمية غير محددة» في لوحة الاحتياجات تعني أن الرقم الحقيقي يُعرف بالهاتف من الجهة المنسّقة."
+            data-fr="<b>Téléphonez avant de charger, pas après.</b> « Quantité non précisée » sur le tableau des besoins signifie que le chiffre réel s'obtient au téléphone auprès du coordinateur."></li>
+        <li data-ar="<b>الوقود والاتصال.</b> محطات الوقود في المناطق المتضررة تنفد أو تُغلق، والشبكة تسقط في الأودية. املأ الخزان قبل الدخول واتفق على نقطة لقاء لا على مكالمة."
+            data-fr="<b>Carburant et communication.</b> Les stations en zone sinistrée se vident ou ferment, et le réseau tombe dans les vallées. Faites le plein avant d'entrer et fixez un point de rendez-vous plutôt qu'un appel."></li>
+        <li data-ar="<b>لا تتحرّك ليلًا في الطرق الجبلية المتضررة.</b> الأشجار المحترقة تسقط بعد مرور النار بساعات، والانهيارات الصخرية شائعة على المنحدرات العارية."
+            data-fr="<b>Évitez les routes de montagne sinistrées de nuit.</b> Les arbres brûlés tombent des heures après le passage du feu, et les éboulements sont fréquents sur les pentes dénudées."></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <span data-ar="المسارات: OSRM على بيانات OpenStreetMap · البؤر: NASA FIRMS · الوجهات: منصة سند عبر هبة الجزائر"
+        data-fr="Itinéraires : OSRM sur données OpenStreetMap · Foyers : NASA FIRMS · Destinations : Sanad via Hiba Algeria"></span>
+</footer>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script src="js/i18n.js?v=10"></script>
+<script src="js/basemap.js?v=10"></script>
+<script src="js/common.js?v=10"></script>
+<script src="js/charts.js?v=10"></script>
+<script src="js/routemap.js?v=10"></script>
+<script>
+let RM = null, GEO = null, FIRES = null, EXPO = null, DESTS = [], NEEDS = null;
+
+/* A route is flagged when it passes within this distance of a fire seen in the
+   last six hours. Not a road-closure feed — nobody publishes one for Algeria —
+   but enough to tell a driver "look at this before you commit". */
+const HAZARD_KM = 5;
+
+const api = (p) => fetch("/api/v1" + p).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+const wname = (code) => {
+  const g = GEO && GEO.features.find((x) => x.properties.code === code);
+  return g ? wilayaName(g.properties) : "—";
+};
+
+async function loadDests() {
+  // Reception centres and collection points are the correct convoy targets: a
+  // convoy should arrive at a sorting point, never at a village directly.
+  let sh = await api("/shelters");
+  if (!sh || !sh.shelters) sh = await fetch("data/shelters.json").then((r) => r.json()).catch(() => null);
+  let pts = await api("/collection-points");
+  if (!pts || !pts.points) pts = await fetch("data/points.json").then((r) => r.json()).catch(() => null);
+
+  DESTS = []
+    .concat(((sh && sh.shelters) || []).map((s) => ({
+      name: s.name, lat: s.lat, lon: s.lon, wilaya: s.wilaya,
+      commune: s.commune, phone: s.phone, kind: "shelter" })))
+    .concat(((pts && pts.points) || []).map((p) => ({
+      name: p.name, lat: p.lat, lon: p.lon, wilaya: p.wilaya,
+      commune: p.commune, phone: p.phone, kind: "point" })))
+    .filter((d) => d.lat && d.lon);
+}
+
+function fillDest() {
+  const sel = document.getElementById("destSel");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">' +
+    (isAr() ? "اختر وجهة…" : "Choisir une destination…") + "</option>" +
+    DESTS.map((d, i) => '<option value="' + i + '">' +
+      (d.kind === "shelter" ? "🏠 " : "📦 ") + d.name +
+      (d.commune ? " — " + d.commune : "") + "</option>").join("");
+  sel.value = cur;
+}
+
+/* Does this route pass near anything currently burning? */
+function hazardsAlong(geometry) {
+  if (!FIRES || !geometry) return [];
+  const active = FIRES.fires.filter((f) => f.active && f.category !== "industrial");
+  const hits = [];
+  for (const f of active) {
+    let best = Infinity;
+    // Sampling every 4th vertex is ample: OSRM emits a vertex every few metres,
+    // and we are asking a 5 km question.
+    for (let i = 0; i < geometry.coordinates.length; i += 4) {
+      const c = geometry.coordinates[i];
+      const d = kmBetween(f.lat, f.lon, c[1], c[0]);
+      if (d < best) best = d;
+    }
+    if (best <= HAZARD_KM) hits.push({ fire: f, km: best });
+  }
+  return hits.sort((a, b) => a.km - b.km);
+}
+
+async function computeRoute() {
+  const L = T();
+  const sel = document.getElementById("destSel");
+  const box = document.getElementById("hazard");
+  if (!RM.here) { RM.hint(L.locateFirst); return; }
+  if (sel.value === "") return;
+
+  const d = DESTS[+sel.value];
+  const res = await RM.route({ lat: d.lat, lon: d.lon, name: d.name,
+                               icon: d.kind === "shelter" ? "🏠" : "📦" },
+                             { min: L.min, km: L.km, by: L.driveTime });
+  document.getElementById("clearBtn").hidden = !!res.error;
+  if (res.error) {
+    box.innerHTML = '<div class="notice danger">' + L.noRoute + "</div>";
+    return;
+  }
+
+  const geo = RM.map.getSource("route") && RM.map.getSource("route")._data;
+  const hits = geo ? hazardsAlong(geo.geometry) : [];
+
+  box.innerHTML =
+    '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat warn"><b>' + n(res.min) + " " + L.min + "</b><span>" +
+        (isAr() ? "زمن الوصول بالطريق" : "temps de trajet") + "</span></div>" +
+      '<div class="stat"><b>' + n(res.km) + " " + L.km + "</b><span>" +
+        (isAr() ? "مسافة الطريق" : "distance routière") + "</span></div>" +
+      '<div class="stat ' + (hits.length ? "danger" : "good") + '"><b>' + n(hits.length) +
+        "</b><span>" + (isAr() ? "بؤرة مشتعلة قرب المسار" : "foyers près du trajet") +
+        "</span></div>" +
+    "</div>" +
+    (hits.length
+      ? '<div class="notice danger"><b>' +
+          (isAr() ? "المسار يمرّ قرب نار مشتعلة" : "L'itinéraire passe près d'un feu actif") +
+        "</b><br>" +
+        hits.slice(0, 4).map((h) =>
+          (isAr() ? "بؤرة " : "Foyer ") + h.fire.id + " — " +
+          n(h.km.toFixed(1)) + " " + L.km + " " +
+          (isAr() ? "من الطريق، " : "de la route, ") +
+          n(Math.round(h.fire.frp_total)) + " MW" +
+          (h.fire.wilaya ? " (" + wname(h.fire.wilaya) + ")" : "")).join("<br>") +
+        "<br><br>" + (isAr()
+          ? "تأكّد من الحماية المدنية (14) أن الطريق سالك قبل التحرّك."
+          : "Confirmez auprès de la Protection civile (14) que la route est praticable.") +
+        "</div>"
+      : '<div class="notice ok">' +
+        (isAr() ? "لا بؤرة مشتعلة ضمن 5 كلم من هذا المسار في آخر رصد. هذا لا يعني أن الطريق سالك — قد يكون مقطوعًا لأسباب أخرى."
+                : "Aucun foyer actif à moins de 5 km de cet itinéraire au dernier relevé. Cela ne garantit pas que la route soit ouverte.") +
+        "</div>") +
+    (d.phone ? '<p class="chart-note">' + (isAr() ? "هاتف الوجهة: " : "Téléphone destination : ") +
+      '<a class="need-tel" href="tel:' + d.phone + '">' + d.phone + "</a></p>" : "");
+}
+
+/* Which destinations serve the communes with the most open critical needs. */
+function renderPriority() {
+  const L = T();
+  const box = document.getElementById("priority");
+  if (!NEEDS) { box.innerHTML = ""; return; }
+
+  const byCommune = {};
+  for (const x of NEEDS.needs) {
+    if (x.status !== "open") continue;
+    const k = x.commune || x.place || "—";
+    byCommune[k] = byCommune[k] || { total: 0, critical: 0, items: [] };
+    byCommune[k].total += 1;
+    if (x.urgency === "critical") byCommune[k].critical += 1;
+    byCommune[k].items.push(x.item);
+  }
+  const ranked = Object.entries(byCommune)
+    .map(([k, v]) => ({ label: k, value: v.critical * 10 + v.total,
+                        display: n(v.total) + (v.critical ? " ⚠" + n(v.critical) : ""),
+                        color: v.critical ? "#C01818" : "#EF7A1A", items: v.items }))
+    .sort((a, b) => b.value - a.value);
+
+  document.getElementById("prioNote").textContent = isAr()
+    ? "البلديات مرتّبة حسب الاحتياجات المفتوحة، والحرجة منها تُرجَّح أولًا. ⚠ = عدد الحاجات الحرجة."
+    : "Communes classées par besoins ouverts, les critiques comptant en premier. ⚠ = nombre de besoins critiques.";
+
+  box.innerHTML = rowChart({ title: "priority", data: ranked, limit: 8 }) +
+    '<div class="prose" style="margin-top:14px"><ul>' +
+    ranked.slice(0, 4).map((r) =>
+      "<li><b>" + r.label + "</b> — " + r.items.slice(0, 4).join("، ") + "</li>").join("") +
+    "</ul></div>";
+}
+
+function labels() {
+  const L = T();
+  document.getElementById("geoBtn").textContent = L.locateMe;
+  document.getElementById("pickBtn").textContent = L.pickOnMap;
+  document.getElementById("clearBtn").textContent = L.clearRoute;
+  document.getElementById("privacy").textContent = L.privacyNote;
+  if (RM) RM.hint(RM.here ? (isAr() ? "اختر وجهة القافلة" : "Choisissez la destination")
+                          : L.locateFirst);
+}
+
+function redraw() { labels(); fillDest(); renderPriority(); }
+
+(async function () {
+  initPage({ redraw });
+
+  RM = createRouteMap({
+    container: "map", hintId: "mapHint", infoId: "routeInfo",
+    center: [5.9, 36.6], zoom: 7.2,
+    onLocate: () => labels(),
+  });
+  document.getElementById("geoBtn").addEventListener("click", () =>
+    RM.locateMe(() => RM.hint(T().locationDenied)));
+  document.getElementById("pickBtn").addEventListener("click", () =>
+    RM.pick(T().pickHintMap));
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    RM.clearRoute();
+    document.getElementById("clearBtn").hidden = true;
+    document.getElementById("hazard").innerHTML = "";
+  });
+  document.getElementById("goBtn").addEventListener("click", computeRoute);
+  document.getElementById("destSel").addEventListener("change", () => {
+    if (RM.here) computeRoute();
+  });
+
+  const style = await basemapStyle();
+  try {
+    if (maplibregl.getRTLTextPluginStatus() === "unavailable") {
+      await maplibregl.setRTLTextPlugin(
+        "https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.js", false);
+    }
+  } catch (e) { /* labels degrade */ }
+
+  GEO = await loadWilayaGeo();
+  FIRES = await loadFires().catch(() => null);
+  await loadDests();
+
+  let nd = await api("/needs");
+  if (!nd || !nd.needs) nd = await fetch("data/needs.json").then((r) => r.json()).catch(() => null);
+  NEEDS = nd;
+
+  await RM.init(style);
+  redraw();
+})();
+</script>
+</body>
+</html>

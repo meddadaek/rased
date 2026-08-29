@@ -1,0 +1,4 @@
+# Backend only. The frontend needs nothing — it is plain HTML/CSS/JS.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6

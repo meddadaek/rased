@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الجمعيات والمساعدة · راصد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet">
+<link href="css/style.css?v=10" rel="stylesheet">
+<link href="css/pages.css?v=10" rel="stylesheet">
+<link href="css/home.css?v=10" rel="stylesheet">
+</head>
+<body>
+
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1 data-ar="الجمعيات والمساعدة" data-fr="Associations et secours"></h1>
+    <p data-ar="جمعيات ومراكز موثّقة بأرقامها. حدّد موقعك ثم اضغط «أظهر الطريق» ليُرسم المسار على الخريطة هنا — دون مغادرة الصفحة."
+       data-fr="Associations et centres vérifiés avec leurs numéros. Indiquez votre position puis appuyez sur « Itinéraire » : le trajet se trace sur la carte ici, sans quitter la page."></p>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="minimap" id="map" style="height:400px;border:0;border-radius:0">
+      <div class="minimap-hint" id="mapHint"></div>
+    </div>
+    <div class="maptools">
+      <button class="btn" id="geoBtn"></button>
+      <button class="btn ghost" id="pickBtn"></button>
+      <button class="btn ghost" id="clearBtn" hidden></button>
+      <span id="routeInfo" class="routeinfo"></span>
+    </div>
+  </div>
+  <p class="privacy" id="privacy" style="margin:-6px 0 18px"></p>
+
+  <div class="toolbar">
+    <select class="wsel" id="wilayaSel"></select>
+    <div class="segs" id="kindSegs"></div>
+    <label class="lay" style="padding:7px 11px">
+      <input type="checkbox" id="osmToggle">
+      <span class="lname" id="osmLabel"></span>
+      <span class="chk">✓</span>
+    </label>
+    <span id="status" style="font-size:11.5px;color:var(--txt-faint)"></span>
+  </div>
+
+  <div id="content"><div class="loading">…</div></div>
+</div>
+
+<footer class="foot">
+  <span data-ar="الجمعيات والمراكز الموثّقة: منصة سند (Quanta Club) عبر هبة الجزائر · المستشفيات ووحدات الحماية المدنية: OpenStreetMap · المسارات: OSRM"
+        data-fr="Associations et centres vérifiés : Sanad (Quanta Club) via Hiba Algeria · Hôpitaux et casernes : OpenStreetMap · Itinéraires : OSRM"></span>
+</footer>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script src="js/i18n.js?v=10"></script>
+<script src="js/basemap.js?v=10"></script>
+<script src="js/common.js?v=10"></script>
+<script src="js/routemap.js?v=10"></script>
+<script>
+let RM = null, ASSETS = null, GEO = null, POINTS = null, SHELTERS = null;
+let fWilaya = "", fKind = "", showOSM = false;
+
+const KINDS = [
+  { v: "",             ar: "الكل",        fr: "Tous" },
+  { v: "association",  ar: "جمعيات",      fr: "Associations" },
+  { v: "shelter",      ar: "مراكز إيواء", fr: "Hébergement" },
+  { v: "fire_station", ar: "حماية مدنية", fr: "Protection civile" },
+  { v: "hospital",     ar: "مستشفيات",    fr: "Hôpitaux" },
+];
+
+const ICON = { association: "🤝", shelter: "🏠", fire_station: "🚒", hospital: "🏥" };
+const COLOR = { association: "#12A594", shelter: "#7B61FF",
+                fire_station: "#2F80ED", hospital: "#E8618C" };
+
+/* OpenStreetMap gives us 2,604 hospitals and 410 casernes nationwide. Drawing
+   all of them turned the map into a solid mass of dots with no signal in it, so
+   they are off by default and, once on, are limited to what is actually near
+   the user. The verified relief points — the ones with confirmed phone numbers —
+   are always shown, because those are the ones worth driving to. */
+const OSM_NEAR_KM = 60;
+const OSM_MAX = 120;
+
+const wname = (code) => {
+  const g = GEO && GEO.features.find((x) => x.properties.code === code);
+  return g ? wilayaName(g.properties) : "—";
+};
+
+const api = (p) => fetch("/api/v1" + p).then((r) => (r.ok ? r.json() : null));
+
+function kindLabel(k) {
+  const L = T();
+  return { association: L.aidOrg, shelter: isAr() ? "مركز إيواء" : "Hébergement",
+           fire_station: L.stationKind, hospital: L.hospitalKind }[k] || k;
+}
+
+/* ─── data ────────────────────────────────────────────────────────────── */
+
+function verifiedPlaces() {
+  const out = [];
+  for (const p of ((POINTS && POINTS.points) || [])) {
+    out.push({ kind: "association", name: p.name, wilaya: p.wilaya,
+               commune: p.commune, address: p.address, phone: p.phone,
+               lat: p.lat, lon: p.lon, trust: p.trust });
+  }
+  for (const s of ((SHELTERS && SHELTERS.shelters) || [])) {
+    out.push({ kind: "shelter", name: s.name, wilaya: s.wilaya,
+               commune: s.commune, address: s.address, phone: s.phone,
+               lat: s.lat, lon: s.lon, trust: s.trust });
+  }
+  return out.filter((p) => p.lat && p.lon);
+}
+
+function osmPlaces() {
+  if (!showOSM || !ASSETS) return [];
+  const here = RM && RM.here;
+  const out = [];
+  for (const k of ["fire_station", "hospital"]) {
+    for (const a of (ASSETS.assets[k] || [])) {
+      if (!a.name || !a.lat) continue;
+      out.push({ kind: k, name: a.name, wilaya: a.wilaya,
+                 lat: a.lat, lon: a.lon, trust: "reported", osm: true });
+    }
+  }
+  if (!here) {
+    // Without a position there is no "near", so fall back to the selected
+    // wilaya rather than dumping the whole country onto the map.
+    return fWilaya ? out.filter((p) => p.wilaya === fWilaya).slice(0, OSM_MAX) : [];
+  }
+  return out
+    .map((p) => ({ ...p, km: kmBetween(here.lat, here.lon, p.lat, p.lon) }))
+    .filter((p) => p.km <= OSM_NEAR_KM)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, OSM_MAX);
+}
+
+function visiblePlaces() {
+  let list = verifiedPlaces().concat(osmPlaces());
+  if (fKind) list = list.filter((p) => p.kind === fKind);
+  if (fWilaya) list = list.filter((p) => p.wilaya === fWilaya);
+  if (RM && RM.here) {
+    list = list.map((p) => ({ ...p,
+      km: p.km !== undefined ? p.km : kmBetween(RM.here.lat, RM.here.lon, p.lat, p.lon) }))
+      .sort((a, b) => a.km - b.km);
+  } else {
+    list.sort((a, b) => (b.trust === "verified") - (a.trust === "verified"));
+  }
+  return list;
+}
+
+/* ─── map layer ───────────────────────────────────────────────────────── */
+
+function placeGeoJSON() {
+  return { type: "FeatureCollection", features: visiblePlaces().map((p) => ({
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+    properties: { name: p.name, kind: p.kind, phone: p.phone || "",
+                  verified: p.trust === "verified" ? 1 : 0 },
+  })) };
+}
+
+function addLayer() {
+  RM.map.addSource("places", { type: "geojson", data: placeGeoJSON() });
+  RM.map.addLayer({
+    id: "places", type: "circle", source: "places",
+    paint: {
+      // Verified points are drawn larger; the OSM background layer recedes.
+      "circle-radius": ["interpolate", ["linear"], ["zoom"],
+        5, ["case", ["==", ["get", "verified"], 1], 6, 3],
+        12, ["case", ["==", ["get", "verified"], 1], 13, 7]],
+      "circle-color": ["match", ["get", "kind"],
+        "association", COLOR.association, "shelter", COLOR.shelter,
+        "fire_station", COLOR.fire_station, COLOR.hospital],
+      "circle-stroke-width": ["case", ["==", ["get", "verified"], 1], 2.5, 1],
+      "circle-stroke-color": "#ffffff",
+      "circle-opacity": ["case", ["==", ["get", "verified"], 1], 0.95, 0.55],
+    },
+  });
+  RM.map.on("mouseenter", "places", () => { RM.map.getCanvas().style.cursor = "pointer"; });
+  RM.map.on("mouseleave", "places", () => { RM.map.getCanvas().style.cursor = ""; });
+  RM.map.on("click", "places", (e) => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup({ offset: 12, maxWidth: "260px" }).setLngLat(e.lngLat)
+      .setHTML('<div class="pop-kind"><i style="background:' +
+        (COLOR[p.kind] || COLOR.hospital) + '"></i>' + kindLabel(p.kind) + "</div>" +
+        '<div class="pop-name">' + p.name + "</div>" +
+        (p.phone ? '<div class="pop-meta"><a href="tel:' + p.phone + '">☎ ' + p.phone + "</a></div>" : ""))
+      .addTo(RM.map);
+  });
+}
+
+/* Self-healing, same as the shelters page: every render either updates the
+   layer or creates it, so one silent rejection at boot cannot leave an empty
+   map with no error on screen. */
+function refreshLayer() {
+  if (!RM || !RM.map) return;
+  const src = RM.map.getSource("places");
+  if (src) { src.setData(placeGeoJSON()); return; }
+  try { addLayer(); } catch (e) { /* style still settling; next render retries */ }
+}
+
+/* ─── lists ───────────────────────────────────────────────────────────── */
+
+function renderNearby() {
+  const L = T();
+  const box = document.getElementById("nearbyHost");
+  if (!box) return;
+  if (!RM || !RM.here) { box.innerHTML = ""; return; }
+
+  const all = verifiedPlaces().concat(osmPlaces());
+  const groups = ["association", "shelter", "fire_station", "hospital"];
+
+  box.innerHTML = '<div class="card"><h3>' + L.nearbyHelp + '</h3><div class="needlist">' +
+    groups.map((k) => {
+      const hit = all.filter((p) => p.kind === k)
+        .map((p) => ({ ...p, km: kmBetween(RM.here.lat, RM.here.lon, p.lat, p.lon) }))
+        .sort((a, b) => a.km - b.km)[0];
+      if (!hit) return "";
+      return '<div class="need u-norm">' +
+        '<div class="need-h"><b>' + ICON[k] + " " + (hit.name || L.unnamed) + "</b>" +
+          (hit.trust ? trustBadge(hit.trust, L) : "") + "</div>" +
+        '<div class="need-w">' + kindLabel(k) + " · " + n(hit.km.toFixed(1)) + " " +
+          L.km + " " + L.direct + "</div>" +
+        '<div class="need-f">' +
+          (hit.phone ? '<a class="need-tel" href="tel:' + hit.phone + '">☎ ' + hit.phone + "</a>"
+                     : '<span class="need-st">—</span>') +
+          '<button class="btn ghost route" data-lat="' + hit.lat + '" data-lon="' + hit.lon +
+            '" data-k="' + k + '" data-name="' + (hit.name || "").replace(/"/g, "&quot;") +
+            '">' + L.showRoute + "</button>" +
+        "</div></div>";
+    }).join("") + "</div></div>";
+}
+
+function renderTable() {
+  const L = T();
+  const rows = visiblePlaces();
+  document.getElementById("status").textContent =
+    n(rows.length) + " " + (isAr() ? "نتيجة" : "résultats");
+
+  document.getElementById("content").innerHTML =
+    '<div id="nearbyHost"></div>' +
+    (!rows.length
+      ? '<div class="card"><p class="none">' +
+        (isAr() ? "حدّد موقعك أو اختر ولاية لعرض النتائج."
+                : "Indiquez votre position ou choisissez une wilaya.") +
+        "</p></div>"
+      : '<div class="tablewrap"><table class="data"><thead><tr>' +
+          "<th>" + (isAr() ? "الجهة" : "Structure") + "</th>" +
+          "<th>" + (isAr() ? "النوع" : "Type") + "</th>" +
+          "<th>" + L.colWilaya + "</th>" +
+          "<th>" + (isAr() ? "الهاتف" : "Téléphone") + "</th>" +
+          (RM && RM.here ? "<th>" + L.km + "</th>" : "") + "<th></th>" +
+        "</tr></thead><tbody>" +
+        rows.slice(0, 250).map((p) =>
+          "<tr><td><b>" + p.name + "</b> " +
+            (p.trust ? trustBadge(p.trust, L) : "") +
+            (p.address ? '<br><span style="font-size:10px;color:var(--txt-faint)">' + p.address + "</span>" : "") +
+          "</td>" +
+          "<td>" + ICON[p.kind] + " " + kindLabel(p.kind) + "</td>" +
+          '<td><a href="wilaya.html?code=' + (p.wilaya || "") + '">' + wname(p.wilaya) + "</a></td>" +
+          "<td>" + (p.phone ? '<a class="need-tel" href="tel:' + p.phone + '">' + p.phone + "</a>" : "—") + "</td>" +
+          (RM && RM.here ? '<td class="num">' + n((p.km || 0).toFixed(1)) + "</td>" : "") +
+          '<td><button class="btn ghost route" data-lat="' + p.lat + '" data-lon="' + p.lon +
+            '" data-k="' + p.kind + '" data-name="' + (p.name || "").replace(/"/g, "&quot;") +
+            '">' + L.showRoute + "</button></td></tr>").join("") +
+        "</tbody></table></div>");
+
+  renderNearby();
+  bindRoutes();
+}
+
+function bindRoutes() {
+  document.querySelectorAll(".route").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const L = T();
+      if (!RM.here) { RM.hint(L.locateFirst); return; }
+      const res = await RM.route(
+        { lat: +b.dataset.lat, lon: +b.dataset.lon,
+          name: b.dataset.name, icon: ICON[b.dataset.k] || "📍" },
+        { min: L.min, km: L.km, by: L.driveTime });
+      document.getElementById("clearBtn").hidden = !!res.error;
+      if (res.error === "no-route") {
+        document.getElementById("routeInfo").textContent = L.noRoute;
+      }
+    }));
+}
+
+function renderControls() {
+  const L = T();
+  document.getElementById("kindSegs").innerHTML = KINDS.map((k) =>
+    '<button class="seg' + (k.v === fKind ? " on" : "") + '" data-v="' + k.v + '">' +
+    (isAr() ? k.ar : k.fr) + "</button>").join("");
+  document.querySelectorAll("#kindSegs .seg").forEach((b) =>
+    b.addEventListener("click", () => {
+      fKind = b.dataset.v; renderControls(); refreshLayer(); renderTable();
+    }));
+
+  document.getElementById("osmLabel").textContent =
+    isAr() ? "أظهر مستشفيات ووحدات OpenStreetMap القريبة"
+           : "Afficher hôpitaux et casernes OSM à proximité";
+  document.getElementById("geoBtn").textContent = L.locateMe;
+  document.getElementById("pickBtn").textContent = L.pickOnMap;
+  document.getElementById("clearBtn").textContent = L.clearRoute;
+  document.getElementById("privacy").textContent = L.privacyNote;
+  if (RM) RM.hint(RM.here ? L.chooseDest : L.locateFirst);
+
+  if (!GEO) return;
+  const sel = document.getElementById("wilayaSel");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">' + (isAr() ? "كل الولايات" : "Toutes les wilayas") +
+    "</option>" + GEO.features.slice()
+      .sort((a, b) => wilayaName(a.properties).localeCompare(wilayaName(b.properties)))
+      .map((g) => '<option value="' + g.properties.code + '">' +
+        wilayaName(g.properties) + "</option>").join("");
+  sel.value = cur || fWilaya;
+}
+
+function redraw() { renderControls(); refreshLayer(); renderTable(); }
+
+document.getElementById("wilayaSel").addEventListener("change", (e) => {
+  fWilaya = e.target.value; refreshLayer(); renderTable();
+});
+document.getElementById("osmToggle").addEventListener("change", (e) => {
+  showOSM = e.target.checked; refreshLayer(); renderTable();
+});
+
+(async function () {
+  initPage({ redraw });
+
+  RM = createRouteMap({
+    container: "map", hintId: "mapHint", infoId: "routeInfo",
+    center: [5.9, 36.6], zoom: 7.2,
+    onLocate: () => { refreshLayer(); renderTable(); renderControls(); },
+  });
+
+  document.getElementById("geoBtn").addEventListener("click", () =>
+    RM.locateMe(() => RM.hint(T().locationDenied)));
+  document.getElementById("pickBtn").addEventListener("click", () =>
+    RM.pick(T().pickHintMap));
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    RM.clearRoute();
+    document.getElementById("clearBtn").hidden = true;
+  });
+
+  const style = await basemapStyle();
+  try {
+    if (maplibregl.getRTLTextPluginStatus() === "unavailable") {
+      await maplibregl.setRTLTextPlugin(
+        "https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.js", false);
+    }
+  } catch (e) { /* labels degrade, map still works */ }
+
+  const [assets, geo] = await Promise.all([loadAssets(), loadWilayaGeo()]);
+  ASSETS = assets; GEO = geo;
+
+  // Verified relief data needs the API; the OSM layer works without it.
+  // API first, static export second — both carry the same verified records.
+  let [pts, sh] = await Promise.all([
+    api("/collection-points").catch(() => null),
+    api("/shelters").catch(() => null),
+  ]);
+  if (!pts || !pts.points) {
+    pts = await fetch("data/points.json").then((r) => r.json()).catch(() => null);
+  }
+  if (!sh || !sh.shelters) {
+    sh = await fetch("data/shelters.json").then((r) => r.json()).catch(() => null);
+  }
+  POINTS = pts && pts.points ? pts : null;
+  SHELTERS = sh && sh.shelters ? sh : null;
+
+  await RM.init(style);
+  redraw();
+  RM.whenReady(() => { if (!RM.map.getSource("places")) addLayer(); })
+    .catch((e) => console.warn("places layer:", e.message));
+})();
+</script>
+</body>
+</html>
