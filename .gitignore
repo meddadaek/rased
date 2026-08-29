@@ -20,6 +20,9 @@ exposure_run.log
 # Vercel
 .vercel/
 
+# Build output — regenerate with backend/build_dist.py
+dist/
+
 # fire_history.json IS committed on purpose: it is the baseline that makes
 # "this fire is new" answerable on the very first run after a deploy. It holds
 # only satellite coordinates and timestamps — public NASA data, nothing personal.

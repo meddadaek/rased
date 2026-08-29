@@ -1,19 +1,21 @@
 /* ─── data source ─────────────────────────────────────────────────────────
    Where the generated payloads are fetched from.
 
-   Locally they sit next to the pages. In production they are served from
-   jsDelivr's CDN, pointed at the public GitHub repository — which has a useful
-   consequence: refreshing the data is a `git push`, not a redeploy. The
-   pipeline can run on a schedule from anywhere and the live site picks it up,
-   with no build step and nothing to keep running.
+   Locally they sit next to the pages. In production they are read straight
+   from the public GitHub repository, which has a useful consequence: refreshing
+   the data is a `git push`, not a redeploy. The pipeline can run on a schedule
+   from anywhere and the live site picks it up, with nothing to rebuild.
 
-   jsDelivr is free, needs no account, sends CORS headers, and caches at the
-   edge. If it were ever unreachable the pages fall back to their own origin,
-   which is where a self-hosted copy keeps its data.
+   raw.githubusercontent rather than jsDelivr, deliberately. Both are free and
+   both send CORS headers, but jsDelivr caches a branch for 7 days at the edge
+   (s-maxage 12 h) while raw sends max-age=300. On a site whose headline number
+   is "fires burning in the last 6 hours", a twelve-hour-stale payload is not a
+   performance trade-off, it is a wrong answer.
    ───────────────────────────────────────────────────────────────────────── */
 
 const DATA_REPO = "meddadaek/rased@main";
-const DATA_CDN = "https://cdn.jsdelivr.net/gh/" + DATA_REPO + "/frontend/data/";
+const DATA_CDN = "https://raw.githubusercontent.com/" +
+  DATA_REPO.replace("@", "/") + "/frontend/data/";
 
 const LOCAL_HOSTS = ["localhost", "127.0.0.1", ""];
 
