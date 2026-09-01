@@ -6,18 +6,10 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 const NAV = [
-  { href: "index.html",   ar: "الرئيسية",         fr: "Accueil" },
-  { href: "map.html",     ar: "الخريطة",          fr: "Carte" },
-  { href: "fires.html",   ar: "الحرائق النشطة",   fr: "Foyers actifs" },
-  { href: "wilayas.html", ar: "الولايات",         fr: "Wilayas" },
-  { href: "report.html",  ar: "بلّغ عن حريق",     fr: "Signaler" },
-  { href: "prepare.html", ar: "كيف تحمي نفسك",    fr: "Se protéger" },
-  { href: "needs.html",   ar: "الاحتياجات",       fr: "Besoins" },
-  { href: "shelters.html",ar: "مراكز الإيواء",    fr: "Hébergement" },
-  { href: "routes.html",  ar: "القوافل والطرق",  fr: "Convois" },
-  { href: "animals.html", ar: "الحيوانات",        fr: "Animaux" },
-  { href: "aid.html",     ar: "الجمعيات",         fr: "Associations" },
-  { href: "about.html",   ar: "كيف يعمل",         fr: "Méthode" },
+  { href: "index.html",   ar: "المجسّم",       fr: "Globe" },
+  { href: "fires.html",   ar: "البؤر النشطة",  fr: "Foyers actifs" },
+  { href: "wilayas.html", ar: "مؤشر الخطر",    fr: "Indice de danger" },
+  { href: "about.html",   ar: "الطريقة",       fr: "Méthode" },
 ];
 
 const CLASS_COLORS = {

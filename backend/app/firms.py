@@ -91,7 +91,21 @@ def normalise(row):
         "when": when,
         "sat": row["_source"],
         "daynight": row.get("daynight", ""),
+        # Ground footprint of the sensor pixel, in km. FIRMS reports it per
+        # detection because it grows towards the edge of the swath: a VIIRS
+        # I-band pixel is 375 m at nadir but nearer 800 m at the scan edge.
+        # Drawing the real footprint is the difference between "a fire is
+        # somewhere here" and a dot that implies precision nobody has.
+        "scan": _f(row.get("scan"), 0.375),
+        "track": _f(row.get("track"), 0.375),
     }
+
+
+def _f(v, default):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
 
 
 # Two detections at the same place separated by more than this are treated as
@@ -374,11 +388,39 @@ def build(map_key, geojson, days=1, sources=None):
             "first_seen_h": round((now - first).total_seconds() / 3600, 1),
             "last_seen_h": round((now - last).total_seconds() / 3600, 1),
             "growing": growing,
+            # The detections themselves, newest first. This is the evidence the
+            # cluster is built from: each one is a satellite pixel that came
+            # back hot, with the sensor that saw it and the minute it passed.
+            # Showing them turns the map from an assertion into something a
+            # reader can check.
+            "points": [
+                {
+                    "lat": round(m["lat"], 4),
+                    "lon": round(m["lon"], 4),
+                    "frp": round(m["frp"], 1),
+                    "sat": m["sat"],
+                    "conf": m["conf"],
+                    "utc": m["when"].isoformat(),
+                    "age_h": round((now - m["when"]).total_seconds() / 3600, 1),
+                    "scan": round(m["scan"], 3),
+                    "track": round(m["track"], 3),
+                    "night": (m.get("daynight") or "").upper().startswith("N"),
+                }
+                for m in sorted(members, key=lambda x: x["when"], reverse=True)
+            ],
         })
 
     # Drop anything that fell outside every wilaya: the bbox overlaps Tunisia,
     # Morocco and the sea, and nobody using this site can act on those.
     fires = [f for f in fires if f["wilaya"]]
+
+    # Industrial heat keeps its totals but drops its individual pixels. Gas
+    # flares account for three quarters of all detections and none of them are
+    # ever drawn at pixel level, so carrying them would triple the payload every
+    # visitor downloads in order to describe Hassi Messaoud burning as usual.
+    for f in fires:
+        if f["category"] == "industrial":
+            f.pop("points", None)
 
     fires.sort(key=lambda f: f["frp_total"], reverse=True)
     kept = save_history(next_history, now)

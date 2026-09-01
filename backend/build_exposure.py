@@ -66,6 +66,15 @@ def totals(exps):
     }
 
 
+# Arabic place names go to stdout below. On a Windows console that defaults to
+# cp1252 that raises UnicodeEncodeError *after* the payload is already written,
+# which makes a successful run look like a failure. Force UTF-8 on the stream.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-route", action="store_true")

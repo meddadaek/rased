@@ -52,6 +52,12 @@ jobs:
         # it pulls 99 days per wilaya to spin the moisture codes up properly.
         run: python backend/pipeline.py
 
+      - name: Orbital elements for the observing satellites
+        # Cheap, keyless, and the globe propagates positions from these in the
+        # browser — so refreshing them here keeps the live satellite tracking
+        # accurate without the page ever calling Celestrak itself.
+        run: python backend/build_tle.py || echo "::warning::TLE refresh failed; keeping the committed snapshot"
+
       - name: Exposure — who is near which fire
         run: |
           if [ "${{ inputs.skip_routing }}" = "true" ]; then

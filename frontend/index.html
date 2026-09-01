@@ -2,234 +2,723 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>راصد · Rased — الإنذار المبكر لحرائق الغابات في الجزائر</title>
-<meta name="description" content="مؤشر خطر الحرائق ومتابعة البؤر النشطة عبر ولايات الجزائر الـ48">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<title>راصد · Rased — مراقبة حرائق الغابات في الجزائر</title>
+<meta name="description" content="مراقبة حيّة لحرائق الغابات في الجزائر على مجسّم أرضي ثلاثي الأبعاد — بؤر مرصودة بالأقمار الاصطناعية ومؤشر خطر لكل ولاية">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
-<link href="css/style.css?v=10" rel="stylesheet">
-<link href="css/pages.css?v=10" rel="stylesheet">
-<link href="css/home.css?v=10" rel="stylesheet">
+<link href="https://unpkg.com/cesium@1.144.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<link href="css/globe.css?v=13" rel="stylesheet">
 </head>
-<body>
+<body class="globe-body">
 
-<nav class="nav" id="nav"></nav>
+<div id="cesium"></div>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="vignette-3d" aria-hidden="true"></div>
 
-<div class="wrap">
+<!-- ── top bar ───────────────────────────────────────────────────── -->
+<header class="hud-top">
+  <a class="hud-brand" href="index.html">
+    <span class="hud-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26">
+        <path d="M16 3c1.6 5.2-3.1 6.9-3.1 11.4 0 2 1.2 3.4 2.5 4.1-.6-2 .4-4.3 2.2-5.4-.4 2.6 1.1 3.4 2.4 5 1.9 2.4 1 6.2-1.6 7.6 4.8-.7 8-4.4 8-9.1C26.4 10 20.6 6.2 16 3z" fill="#FF6B35"/>
+        <path d="M13.4 20.6c-1.3 1.3-1.5 3.6-.2 5.1-2.3-.7-3.9-2.9-3.9-5.4 0-1.7.7-3 1.7-4.2.2 2 1.3 3.6 2.4 4.5z" fill="#FFC15E"/>
+      </svg>
+    </span>
+    <span class="hud-name"><b>راصد</b><i id="tagline"></i></span>
+  </a>
 
-  <!-- ── hero ───────────────────────────────────────────────── -->
-  <section class="hero">
-    <div class="hero-txt">
-      <h1 data-ar="نعرف أين ستشتعل، قبل أن تشتعل."
-          data-fr="Savoir où le feu va partir, avant qu'il ne parte."></h1>
-      <p data-ar="راصد يحسب خطر اندلاع حرائق الغابات في ولايات الجزائر الـ48 من بيانات طقس حقيقية، ويتابع البؤر النشطة بالأقمار الاصطناعية، ويقول لك من هم السكان القريبون منها ومن أقرب من يستطيع الوصول إليهم."
-         data-fr="Rased calcule le danger d'incendie sur les 48 wilayas à partir de données météo réelles, suit les foyers actifs par satellite, et indique qui se trouve à proximité et qui peut les atteindre le plus vite."></p>
-      <div class="hero-cta">
-        <a class="btn" href="map.html" data-ar="افتح الخريطة" data-fr="Ouvrir la carte"></a>
-        <a class="btn ghost" href="report.html" data-ar="بلّغ عن حريق" data-fr="Signaler un feu"></a>
-      </div>
+  <nav class="hud-nav" id="hudNav"></nav>
+
+  <div class="hud-right">
+    <span class="hud-stamp"><b id="srcBadge">—</b><i id="stampTime"></i></span>
+    <div class="hud-langs">
+      <button class="hud-lang" data-lang="ar">ع</button>
+      <button class="hud-lang" data-lang="fr">FR</button>
     </div>
-    <div class="hero-em">
-      <div class="hero-em-t" data-ar="عند رؤية حريق" data-fr="Si vous voyez un feu"></div>
-      <a href="tel:14" class="hero-num"><b>14</b><span data-ar="الحماية المدنية" data-fr="Protection civile"></span></a>
-      <a href="tel:1021" class="hero-num"><b>1021</b><span data-ar="الحماية المدنية" data-fr="Protection civile"></span></a>
-      <a href="tel:1055" class="hero-num"><b>1055</b><span data-ar="الدرك الوطني" data-fr="Gendarmerie"></span></a>
-      <a href="tel:1070" class="hero-num"><b>1070</b><span data-ar="محافظة الغابات — للتبليغ عن حريق" data-fr="Conservation des forêts — signaler un feu"></span></a>
-    </div>
-  </section>
-
-  <!-- ── live situation ─────────────────────────────────────── -->
-  <section class="live" id="live">
-    <div class="live-head">
-      <h2 data-ar="الوضع الآن" data-fr="La situation maintenant"></h2>
-      <span class="live-stamp" id="liveStamp"></span>
-    </div>
-    <div class="grid4" id="liveStats"><div class="loading">…</div></div>
-    <div id="liveHot"></div>
-  </section>
-
-  <!-- ── cards ──────────────────────────────────────────────── -->
-  <section class="cards" id="cards"></section>
-
-  <!-- ── how it works, short ────────────────────────────────── -->
-  <section class="card" style="margin-top:8px">
-    <h3 data-ar="من أين تأتي الأرقام" data-fr="D'où viennent les chiffres"></h3>
-    <div class="prose">
-      <p data-ar="خطر الاشتعال محسوب بمؤشر الطقس الحرائقي الكندي (FWI) — نفس المنظومة التي تعتمدها أوروبا في حوض المتوسط — من طقس حقيقي مع تراكم جفاف على 72 يومًا. البؤر النشطة من أقمار NASA. السكان والمستشفيات والجمعيات ووحدات الحماية المدنية من OpenStreetMap. أزمنة الوصول محسوبة على شبكة الطرق الحقيقية."
-         data-fr="Le danger est calculé avec l'Indice Forêt-Météo canadien (FWI) — le système utilisé en Europe sur le bassin méditerranéen — à partir de météo réelle et d'un cumul de sécheresse sur 72 jours. Les foyers viennent des satellites NASA. Population, hôpitaux, associations et unités de la Protection civile viennent d'OpenStreetMap. Les temps d'accès sont calculés sur le réseau routier réel."></p>
-    </div>
-    <a href="about.html" class="morelink" data-ar="الطريقة وحدودها ←" data-fr="La méthode et ses limites →"></a>
-  </section>
-
-  <div class="notice danger" style="margin-top:6px">
-    <span data-ar="<b>راصد ليس أمر إخلاء.</b> هو أداة توعية وتخطيط. القرار الميداني للحماية المدنية وحدها."
-          data-fr="<b>Rased n'est pas un ordre d'évacuation.</b> C'est un outil de sensibilisation et de planification. La décision opérationnelle relève de la seule Protection civile."></span>
   </div>
+</header>
+
+<!-- ── left telemetry rail ───────────────────────────────────────── -->
+<aside class="hud-rail" id="rail">
+  <div class="rail-block">
+    <div class="rail-h" id="hLive"></div>
+    <div class="rail-stats" id="liveStats"></div>
+    <div class="rail-note" id="liveNote"></div>
+  </div>
+
+  <div class="rail-block">
+    <div class="rail-h" id="hFires"></div>
+    <div class="win-chips" id="winChips"></div>
+    <div class="rail-list" id="fireList"></div>
+  </div>
+
+  <div class="rail-block">
+    <div class="rail-h" id="hSat"></div>
+    <div class="rail-list" id="satList"></div>
+    <p class="rail-foot" id="satFoot"></p>
+  </div>
+
+  <div class="rail-block">
+    <div class="rail-h" id="hRisk"></div>
+    <div class="rail-list" id="riskList"></div>
+  </div>
+</aside>
+
+<!-- ── target readout ────────────────────────────────────────────── -->
+<section class="hud-target" id="target" hidden>
+  <button class="target-x" id="targetClose" aria-label="close">✕</button>
+  <div class="target-head">
+    <span class="target-id" id="tId"></span>
+    <span class="target-w" id="tWilaya"></span>
+  </div>
+  <div class="target-state" id="tState"></div>
+  <div class="target-grid" id="tGrid"></div>
+  <div class="target-near" id="tNear"></div>
+  <div class="target-act">
+    <button id="tInspect"></button>
+    <button id="tPixels"></button>
+  </div>
+  <div class="target-dets" id="tDets"></div>
+</section>
+
+<!-- ── tour banner ───────────────────────────────────────────────── -->
+<div class="hud-tour" id="tourBar" hidden>
+  <span class="tour-dot" aria-hidden="true"></span>
+  <span id="tourText"></span>
+  <button id="tourStop"></button>
 </div>
 
-<footer class="foot">
-  <span data-ar="مفتوح المصدر · الطقس: Open-Meteo · البؤر: NASA FIRMS · الخرائط: OpenStreetMap و OpenFreeMap · الحدود: geoBoundaries (ODbL) · المسارات: OSRM"
-        data-fr="Open source · Météo : Open-Meteo · Foyers : NASA FIRMS · Cartes : OpenStreetMap et OpenFreeMap · Limites : geoBoundaries (ODbL) · Itinéraires : OSRM"></span>
+<!-- ── bottom controls ───────────────────────────────────────────── -->
+<footer class="hud-bottom">
+  <div class="hud-controls">
+    <div class="hud-imagery">
+      <span class="ctl-h" id="imgH"></span>
+      <div class="ctl-row" id="imagery"></div>
+      <div class="ctl-row date-row" id="dateRow" hidden>
+        <button id="dPrev">‹</button>
+        <span id="dLabel"></span>
+        <button id="dNext">›</button>
+      </div>
+    </div>
+    <div class="hud-toggles" id="toggles"></div>
+  </div>
+  <div class="hud-emergency">
+    <span id="emLabel"></span>
+    <a href="tel:14">14</a><a href="tel:1021">1021</a><a href="tel:1070">1070</a>
+  </div>
 </footer>
 
-<script src="js/config.js?v=10"></script>
-<script src="js/i18n.js?v=10"></script>
-<script src="js/common.js?v=10"></script>
-<script src="js/welcome.js?v=10"></script>
-<script>
-let FIRES = null, EXPO = null, RISK = null, GEO = null;
+<div class="hud-keys" id="keyHint"></div>
 
-const CARDS = [
-  { href: "map.html",     icon: "🗺️", ar: ["خريطة الوضع", "البؤر النشطة وخطر كل ولاية على خريطة واحدة"],
-                                        fr: ["Carte de situation", "Foyers actifs et danger par wilaya sur une seule carte"] },
-  { href: "fires.html",   icon: "🔥", ar: ["الحرائق النشطة", "كل بؤرة مشتعلة الآن، مرتّبة حسب الخطر على السكان"],
-                                        fr: ["Foyers actifs", "Chaque foyer en cours, classé par danger pour les habitants"] },
-  { href: "wilayas.html", icon: "📊", ar: ["توقّع الخطر", "خطر الاشتعال في الولايات الـ48 إلى سبعة أيام"],
-                                        fr: ["Prévision du danger", "Le risque sur les 48 wilayas à sept jours"] },
-  { href: "report.html",  icon: "📍", ar: ["بلّغ عن حريق", "بلاغك يُقارن آليًا برصد الأقمار الاصطناعية"],
-                                        fr: ["Signaler un feu", "Votre signalement est recoupé avec les satellites"] },
-  { href: "needs.html",   icon: "📦", ar: ["الاحتياجات", "ما ينقص المناطق المتضرّرة، وتعهّد بتغطيته"],
-                                        fr: ["Besoins", "Ce qui manque aux zones touchées, et s'y engager"] },
-  { href: "shelters.html",icon: "🏠", ar: ["مراكز الإيواء", "أين تُستقبل العائلات التي أُجليت"],
-                                        fr: ["Hébergement", "Où sont accueillies les familles évacuées"] },
-  { href: "aid.html",     icon: "🤝", ar: ["الجمعيات والمساعدة", "أقرب مستشفى وجمعية ووحدة حماية مدنية من موقعك"],
-                                        fr: ["Associations et secours", "Hôpital, association et caserne les plus proches"] },
-  { href: "routes.html",  icon: "🚚", ar: ["دليل القوافل والطرق", "احسب مسار قافلتك وتحقّق إن كان يمرّ قرب نار"],
-                                        fr: ["Convois et itinéraires", "Calculez le trajet et vérifiez s'il longe un feu"] },
-  { href: "animals.html", icon: "🐑", ar: ["الحيوانات والمواشي", "علف وماء ورعاية بيطرية، وأقرب طبيب بيطري"],
-                                        fr: ["Animaux et cheptel", "Fourrage, eau, soins et vétérinaire le plus proche"] },
-  { href: "prepare.html", icon: "🛡️", ar: ["كيف تحمي نفسك", "ما تفعله قبل الحريق وأثناءه وبعده"],
-                                        fr: ["Se protéger", "Quoi faire avant, pendant et après un incendie"] },
+<div class="hud-boot" id="boot">
+  <div class="boot-globe"></div>
+  <span id="bootText">…</span>
+</div>
+
+<script src="https://unpkg.com/cesium@1.144.0/Build/Cesium/Cesium.js"></script>
+<!-- SGP4 orbit propagation, so the satellites are computed live in the browser
+     rather than polled from anywhere. -->
+<script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="js/config.js?v=13"></script>
+<script src="js/i18n.js?v=13"></script>
+<script src="js/common.js?v=13"></script>
+<script src="js/globe.js?v=13"></script>
+<script src="js/satellites.js?v=13"></script>
+<script>
+let RISK = null, FIRES = null, EXPO = null, GEO = null, EXPO_BY_ID = {};
+let show = { fires: true, danger: true, sats: true };
+let SELECTED = null;
+
+/* How far back the globe looks. Six hours is "burning now" — that is the
+   window a satellite pass can actually vouch for. The wider windows are for
+   reading the last day or two, which is what you want when the fires are out
+   and you are trying to see where they were. */
+const WINDOWS = [6, 12, 24, 48];
+let winH = 6;
+
+const wname = (code) => {
+  const g = GEO && GEO.features.find((x) => x.properties.code === code);
+  return g ? wilayaName(g.properties) : "—";
+};
+
+const vegFires = () =>
+  FIRES ? FIRES.fires.filter((f) => f.category !== "industrial") : [];
+
+const inWindow = (h) => vegFires().filter((f) => f.last_seen_h <= h);
+
+/* Open on the tightest window that actually contains something. Landing on an
+   empty globe reads as broken even when "nothing is burning" is the honest
+   and welcome answer. */
+function defaultWindow() {
+  for (const h of WINDOWS) if (inWindow(h).length) return h;
+  return 48;
+}
+
+/* ─── chrome ──────────────────────────────────────────────────────── */
+
+function renderChrome() {
+  document.getElementById("tagline").textContent =
+    isAr() ? "مراقبة حرائق الغابات · الجزائر" : "Surveillance des feux · Algérie";
+  document.getElementById("hudNav").innerHTML = NAV.map((x) =>
+    '<a href="' + x.href + '"' + (x.href === "index.html" ? ' class="on"' : "") +
+    ">" + x[LANG] + "</a>").join("");
+  document.querySelectorAll(".hud-lang").forEach((b) =>
+    b.classList.toggle("on", b.dataset.lang === LANG));
+
+  document.getElementById("hLive").textContent = isAr() ? "الوضع الآن" : "Situation";
+  document.getElementById("hFires").textContent = isAr() ? "البؤر المرصودة" : "Foyers détectés";
+  document.getElementById("hRisk").textContent = isAr() ? "أعلى خطر اليوم" : "Danger le plus élevé";
+  document.getElementById("emLabel").textContent =
+    isAr() ? "عند رؤية حريق" : "Si vous voyez un feu";
+  document.getElementById("tourStop").textContent = isAr() ? "إيقاف" : "Arrêter";
+
+  document.getElementById("keyHint").innerHTML = [
+    ["Space", isAr() ? "جولة" : "Survol"],
+    ["H", isAr() ? "الجزائر" : "Algérie"],
+    ["F", isAr() ? "البؤر" : "Foyers"],
+    ["D", isAr() ? "الخطر" : "Danger"],
+  ].map(([k, l]) => "<span><kbd>" + k + "</kbd>" + l + "</span>").join("");
+
+  document.getElementById("toggles").innerHTML = [
+    { k: "fires",  ar: "البؤر", fr: "Foyers" },
+    { k: "danger", ar: "طبقة الخطر", fr: "Couche de danger" },
+    { k: "sats",   ar: "الأقمار", fr: "Satellites" },
+  ].map((t) =>
+    '<button class="tgl' + (show[t.k] ? " on" : "") + '" data-k="' + t.k + '">' +
+    (isAr() ? t.ar : t.fr) + "</button>").join("") +
+    '<button class="tgl' + (tourRunning() ? " on" : "") + '" id="tourBtn">' +
+      (isAr() ? "جولة" : "Survol") + "</button>" +
+    '<button class="tgl" id="homeBtn">' + (isAr() ? "الجزائر" : "Algérie") + "</button>";
+
+  document.querySelectorAll(".tgl[data-k]").forEach((b) =>
+    b.addEventListener("click", () => toggleLayer(b.dataset.k)));
+  document.getElementById("homeBtn").addEventListener("click", () => {
+    stopTour(); onTourEnd(); flyHome();
+  });
+  document.getElementById("tourBtn").addEventListener("click", toggleTour);
+}
+
+function toggleLayer(k) {
+  show[k] = !show[k];
+  if (k === "fires") setFiresVisible(show.fires);
+  if (k === "danger") setDangerVisible(show.danger);
+  if (k === "sats") setSatellitesVisible(show.sats);
+  renderChrome();
+}
+
+/* ─── satellites ──────────────────────────────────────────────────── */
+
+/* The spacecraft that produce every detection on this map, and when the next
+   one is due over the fire belt. This is the part of the system that is
+   genuinely live — the positions are propagated in the browser from orbital
+   elements, second by second, with nothing being fetched. */
+function renderSatRail() {
+  document.getElementById("hSat").textContent =
+    isAr() ? "أقمار الرصد" : "Satellites d'observation";
+
+  const rows = overpasses();
+  const list = document.getElementById("satList");
+
+  if (!rows.length) {
+    list.innerHTML = '<p class="rail-none">' +
+      (isAr() ? "تعذّر حساب المدارات." : "Orbites indisponibles.") + "</p>";
+    document.getElementById("satFoot").textContent = "";
+    return;
+  }
+
+  list.innerHTML = rows.map((r) => {
+    const overhead = r.overhead;
+    const when = !r.next ? "—"
+      : r.next.minutes < 1
+        ? (isAr() ? "الآن" : "maintenant")
+        : r.next.minutes < 60
+          ? (isAr() ? "بعد " + n(Math.round(r.next.minutes)) + " د"
+                    : "dans " + n(Math.round(r.next.minutes)) + " min")
+          : (isAr() ? "بعد " + n((r.next.minutes / 60).toFixed(1)) + " سا"
+                    : "dans " + n((r.next.minutes / 60).toFixed(1)) + " h");
+
+    return '<button class="rail-row" data-sat="' + r.meta.short + '">' +
+      '<span class="rr-dot' + (overhead ? " beat" : "") + '" style="background:' +
+        (r.meta.sensor === "VIIRS" ? "#4FC3F7" : "#B39DDB") + '"></span>' +
+      '<span class="rr-main"><b>' + (isAr() ? r.meta.name_ar : r.meta.name_fr) +
+        "</b><i>" + r.meta.sensor + " · " +
+        (overhead ? (isAr() ? "فوق الجزائر الآن" : "au-dessus maintenant")
+                  : (isAr() ? "المرور القادم" : "prochain passage")) + "</i></span>" +
+      '<span class="rr-num' + (overhead ? " live" : "") + '">' + when + "</span>" +
+    "</button>";
+  }).join("");
+
+  document.querySelectorAll("[data-sat]").forEach((b) =>
+    b.addEventListener("click", () => {
+      stopTour(); onTourEnd();
+      if (!show.sats) toggleLayer("sats");
+      flyToSatellite(b.dataset.sat);
+    }));
+
+  /* The caveat that makes the rest of the numbers readable: this system only
+     knows what the last overpass saw. */
+  document.getElementById("satFoot").textContent = isAr()
+    ? "لا تُرصد الحرائق إلا أثناء مرور قمر. بين المرورين، الخريطة تعرض آخر ما رُئي."
+    : "Les feux ne sont vus qu'au passage d'un satellite. Entre deux passages, la carte montre le dernier relevé.";
+}
+
+/* ─── imagery ─────────────────────────────────────────────────────── */
+
+/* Which picture of the ground is on the globe. The Esri base is sharp but it
+   is a mosaic stitched over months; the NASA layers are the actual pass from a
+   named day, which is where smoke and burn scars live. */
+let imgKind = null;
+let imgDate = gibsDefaultDate();
+
+const IMG_OPTS = [
+  { k: null,        ar: "قمر صناعي",   fr: "Satellite" },
+  { k: "truecolor", ar: "لون طبيعي",   fr: "Couleur réelle" },
+  { k: "fire",      ar: "حرائق وآثار", fr: "Feux et cicatrices" },
 ];
 
-function renderCards() {
-  document.getElementById("cards").innerHTML = CARDS.map((c) => {
-    const [title, desc] = isAr() ? c.ar : c.fr;
-    return '<a class="hcard" href="' + c.href + '">' +
-      '<span class="hcard-i">' + c.icon + "</span>" +
-      "<b>" + title + "</b><p>" + desc + "</p>" +
-      '<span class="hcard-go">' + (isAr() ? "←" : "→") + "</span></a>";
-  }).join("");
+function renderImagery() {
+  document.getElementById("imgH").textContent =
+    isAr() ? "صورة الأرض" : "Imagerie";
+
+  document.getElementById("imagery").innerHTML = IMG_OPTS.map((o) =>
+    '<button class="tgl' + (o.k === imgKind ? " on" : "") + '" data-img="' +
+    (o.k || "") + '">' + (isAr() ? o.ar : o.fr) + "</button>").join("");
+
+  document.querySelectorAll("[data-img]").forEach((b) =>
+    b.addEventListener("click", () => setImagery(b.dataset.img || null)));
+
+  const row = document.getElementById("dateRow");
+  row.hidden = !imgKind;
+  if (imgKind) {
+    document.getElementById("dLabel").textContent =
+      new Date(imgDate + "T12:00:00Z").toLocaleDateString(T().locale,
+        { day: "numeric", month: "short" });
+  }
 }
 
-function renderLive() {
-  const L = T();
-  const box = document.getElementById("liveStats");
+function setImagery(kind) {
+  imgKind = kind;
+  setGibs(kind, imgDate);
+  renderImagery();
+}
 
-  if (!FIRES) { box.innerHTML = '<div class="loading">…</div>'; return; }
+/* Step the imagery day by day. GIBS keeps a full archive, so walking backwards
+   shows the burn scar growing across the days the fire was running — which is
+   the clearest answer there is to "how much of the forest went". */
+function stepDate(days) {
+  const d = new Date(imgDate + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  const iso = d.toISOString().slice(0, 10);
+  // Never walk into the future: the pass has not happened yet.
+  if (iso > gibsDefaultDate()) return;
+  imgDate = iso;
+  if (imgKind) setGibs(imgKind, imgDate);
+  renderImagery();
+}
 
-  // Only fires a satellite has seen recently. Anything older has most likely
-  // been put out, and calling it "burning now" on a homepage would be a lie.
-  const veg = FIRES.fires.filter((f) => f.category !== "industrial");
-  const active = veg.filter((f) => f.active);
-  const brandNew = active.filter((f) => f.is_new);
+document.getElementById("dPrev").addEventListener("click", () => stepDate(-1));
+document.getElementById("dNext").addEventListener("click", () => stepDate(1));
 
-  const expoById = {};
-  if (EXPO) EXPO.fires.forEach((e) => { expoById[e.id] = e; });
-  const pop5 = active.reduce((a, f) => a + (expoById[f.id] ? expoById[f.id].rings.r5.pop : 0), 0);
+function stamp() {
+  if (!FIRES) return;
+  const live = FIRES.source !== "MOCK";
+  const b = document.getElementById("srcBadge");
+  b.textContent = live ? "LIVE" : "MOCK";
+  b.className = live ? "live" : "";
+  /* Age, not a timestamp: "checked 4 minutes ago" answers the question a
+     visitor is actually asking, which is whether this thing is still running. */
+  const mins = Math.max(0, Math.round((Date.now() - new Date(FIRES.generated_at)) / 60000));
+  document.getElementById("stampTime").textContent = mins < 60
+    ? (isAr() ? "قبل " + n(mins) + " د" : "il y a " + n(mins) + " min")
+    : (isAr() ? "قبل " + n(Math.round(mins / 60)) + " سا"
+              : "il y a " + n(Math.round(mins / 60)) + " h");
+}
 
-  // Worst wilaya by forecast danger, not by fire count: the point of the page
-  // is that danger precedes fire.
-  let worst = null;
+/* ─── rail ────────────────────────────────────────────────────────── */
+
+function renderRail() {
+  if (!FIRES) return;
+
+  const act = inWindow(6);                    // burning now, by satellite
+  const shown = inWindow(winH);               // what the globe is drawing
+  const brandNew = act.filter((f) => f.is_new).length;
+  const pop = shown.reduce((a, f) =>
+    a + (EXPO_BY_ID[f.id] ? EXPO_BY_ID[f.id].rings.r5.pop : 0), 0);
+
+  const extreme = RISK
+    ? Object.values(RISK.wilayas).filter((w) =>
+        w.days[0].class === "extreme" || w.days[0].class === "very_high").length
+    : 0;
+
+  document.getElementById("liveStats").innerHTML =
+    stat(n(act.length), isAr() ? "بؤرة مشتعلة" : "foyers en cours",
+         isAr() ? "رُصدت خلال 6 ساعات" : "vus dans les 6 h", act.length ? "hot" : "calm") +
+    stat(n(extreme), isAr() ? "ولاية في خطر شديد" : "wilayas en danger élevé",
+         isAr() ? "مؤشر الخطر اليوم" : "indice du jour", extreme ? "warn" : "") +
+    stat(nInt(pop), isAr() ? "نسمة" : "habitants",
+         isAr() ? "ضمن 5 كلم من بؤرة" : "à moins de 5 km d'un foyer", pop ? "warn" : "");
+
+  /* When nothing is burning, say so plainly and say when the last detection
+     was. A fire map that goes quiet is reporting good news, and it should read
+     that way rather than looking like it failed to load. */
+  const veg = vegFires();
+  const note = document.getElementById("liveNote");
+  if (!act.length && veg.length) {
+    const last = Math.min.apply(null, veg.map((f) => f.last_seen_h));
+    note.className = "rail-note calm";
+    note.innerHTML = isAr()
+      ? "<b>لا بؤرة مشتعلة الآن.</b> آخر رصد قبل " + n(last.toFixed(1)) +
+        " ساعة. الخطر يبقى مرتفعًا — البؤر تنطفئ، الظروف لا."
+      : "<b>Aucun foyer en cours.</b> Dernière détection il y a " +
+        n(last.toFixed(1)) + " h. Le danger reste élevé — les feux s'éteignent, pas les conditions.";
+  } else if (act.length) {
+    note.className = "rail-note";
+    note.textContent = brandNew
+      ? (isAr() ? n(brandNew) + " منها اندلعت منذ الرصد السابق."
+                : n(brandNew) + " nouveaux départs depuis le relevé précédent.")
+      : (isAr() ? "لا اندلاع جديد منذ الرصد السابق."
+                : "Aucun nouveau départ depuis le relevé précédent.");
+  } else {
+    note.className = "rail-note";
+    note.textContent = "";
+  }
+
+  // Window scrubber.
+  document.getElementById("winChips").innerHTML = WINDOWS.map((h) =>
+    '<button class="wchip' + (h === winH ? " on" : "") + '" data-win="' + h + '">' +
+    n(h) + (isAr() ? " سا" : " h") +
+    "<i>" + n(inWindow(h).length) + "</i></button>").join("");
+  document.querySelectorAll("[data-win]").forEach((b) =>
+    b.addEventListener("click", () => setWindow(+b.dataset.win)));
+
+  // Strongest detections inside the window.
+  const top = shown.slice().sort((a, b) => b.frp_total - a.frp_total).slice(0, 6);
+  document.getElementById("fireList").innerHTML = !top.length
+    ? '<p class="rail-none">' +
+        (isAr() ? "لا بؤر في هذه المدة." : "Aucun foyer sur cette période.") + "</p>"
+    : top.map((f) => {
+        const e = EXPO_BY_ID[f.id];
+        const c = f.last_seen_h <= 2 ? "#FFD166" : f.last_seen_h <= 6 ? "#E4572E" : "#8E4B2E";
+        return '<button class="rail-row" data-fire="' + f.id + '">' +
+          '<span class="rr-dot" style="background:' + c + '"></span>' +
+          '<span class="rr-main"><b>' + wname(f.wilaya) + "</b>" +
+            "<i>" + (e && e.rings.r5.pop ? nInt(e.rings.r5.pop) + " " + (isAr() ? "نسمة" : "hab.")
+                                         : (isAr() ? "منطقة خالية" : "zone inhabitée")) + "</i></span>" +
+          '<span class="rr-num">' + n(Math.round(f.frp_total)) + "<i>MW</i></span>" +
+        "</button>";
+      }).join("");
+
+  document.querySelectorAll("[data-fire]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const f = FIRES.fires.find((x) => x.id === b.dataset.fire);
+      if (f) { stopTour(); onTourEnd(); flyToFire(f); showTarget(f); }
+    }));
+
+  // Highest forecast danger — the point being that danger precedes fire.
   if (RISK && GEO) {
-    for (const g of GEO.features) {
+    const rows = GEO.features.map((g) => {
       const w = RISK.wilayas[g.properties.code];
-      if (!w) continue;
-      const d = w.days[0];
-      if (!worst || d.fwi > worst.fwi) worst = { fwi: d.fwi, cls: d.class, p: g.properties };
+      return w ? { p: g.properties, d: w.days[0] } : null;
+    }).filter(Boolean).sort((a, b) => b.d.fwi - a.d.fwi).slice(0, 6);
+
+    document.getElementById("riskList").innerHTML = rows.map((r) =>
+      '<a class="rail-row" href="wilaya.html?code=' + r.p.code + '">' +
+        '<span class="rr-dot" style="background:' + CLASS_COLORS[r.d.class] + '"></span>' +
+        '<span class="rr-main"><b>' + wilayaName(r.p) + "</b><i>" + T().cls[r.d.class] + "</i></span>" +
+        '<span class="rr-num" style="color:' + CLASS_COLORS[r.d.class] + '">' +
+          n(r.d.fwi.toFixed(0)) + "</span>" +
+      "</a>").join("");
+  }
+}
+
+const stat = (v, label, sub, cls) =>
+  '<div class="rail-stat ' + (cls || "") + '"><b>' + v + "</b>" +
+  "<span>" + label + "<i>" + sub + "</i></span></div>";
+
+function setWindow(h) {
+  winH = h;
+  stopTour();
+  onTourEnd();
+  addFires(FIRES.fires, winH);
+  setFiresVisible(show.fires);
+  renderRail();
+}
+
+/* ─── target readout ──────────────────────────────────────────────── */
+
+function showTarget(f) {
+  const e = EXPO_BY_ID[f.id];
+  SELECTED = f;
+
+  document.getElementById("tId").textContent = f.id;
+  document.getElementById("tWilaya").textContent = wname(f.wilaya);
+
+  // State first: whether this one is still going is the whole question.
+  const live = f.last_seen_h <= 6;
+  const st = document.getElementById("tState");
+  st.className = "target-state " + (live ? "live" : "out");
+  st.textContent = live
+    ? (isAr() ? "مرصودة ضمن آخر 6 ساعات" : "Détecté dans les 6 dernières heures")
+    : (isAr() ? "لم تُرصد منذ " + n(f.last_seen_h.toFixed(1)) + " ساعة"
+              : "Plus détecté depuis " + n(f.last_seen_h.toFixed(1)) + " h");
+
+  const cells = [
+    [n(Math.round(f.frp_total)) + " MW", isAr() ? "الطاقة الإشعاعية" : "Puissance"],
+    [n(f.detections), isAr() ? "عمليات رصد" : "Détections"],
+    [n(Math.round(f.burning_hours)) + (isAr() ? " سا" : " h"), isAr() ? "امتدّت على" : "Étalé sur"],
+    [n(f.last_seen_h.toFixed(1)) + (isAr() ? " سا" : " h"), isAr() ? "آخر رصد" : "Dernier passage"],
+  ];
+  if (e) {
+    cells.push([nInt(e.rings.r5.pop), isAr() ? "نسمة ضمن 5 كلم" : "hab. dans 5 km"]);
+    if (e.station && e.station.route) {
+      cells.push([n(e.station.route.min) + (isAr() ? " د" : " min"),
+                  isAr() ? "أقرب وحدة إطفاء" : "Caserne la plus proche"]);
     }
   }
+  document.getElementById("tGrid").innerHTML = cells.map(function (c) {
+    return '<div class="tcell"><b>' + c[0] + "</b><span>" + c[1] + "</span></div>";
+  }).join("");
 
+  const near = e ? e.rings.r5.nearest.slice(0, 4) : [];
+  document.getElementById("tNear").innerHTML = !near.length ? "" :
+    '<div class="tnear-h">' + (isAr() ? "أقرب التجمعات" : "Localités les plus proches") + "</div>" +
+    near.map((p) => '<span class="tchip">' + p.name + " · " + n(p.km.toFixed(1)) +
+      (isAr() ? " كلم" : " km") + "</span>").join("");
+
+  if (pixelsOn) showDetections(f);
+  renderTargetActions();
+  document.getElementById("target").hidden = false;
+}
+
+/* ─── the evidence behind a fire ──────────────────────────────────── */
+
+/* Every fire on this map is a cluster of satellite pixels. These two buttons
+   let a reader go and look at them: fly down to the ground, and draw each
+   detection at its true footprint with the sensor and minute that recorded
+   it. It is the difference between being told and being shown. */
+function renderTargetActions() {
+  const f = SELECTED;
+  const nDet = f && f.points ? f.points.length : 0;
+
+  document.getElementById("tInspect").textContent =
+    isAr() ? "اقترب من الموقع" : "Descendre sur le site";
+
+  const btn = document.getElementById("tPixels");
+  btn.className = pixelsOn ? "on" : "";
+  btn.disabled = !nDet;
+  btn.textContent = nDet
+    ? (isAr() ? "بكسلات الرصد (" + n(nDet) + ")"
+              : "Pixels détectés (" + n(nDet) + ")")
+    : (isAr() ? "لا تفاصيل بكسل" : "Pas de détail pixel");
+
+  const box = document.getElementById("tDets");
+  if (!pixelsOn || !nDet) { box.innerHTML = ""; return; }
+
+  // The most recent handful, newest first: which satellite, how long ago, how
+  // hot, and how big the pixel on the ground actually was.
   box.innerHTML =
-    '<div class="stat ' + (active.length ? "danger" : "good") + '"><b>' + n(active.length) + "</b>" +
-      "<span>" + (isAr() ? "بؤرة مشتعلة الآن" : "foyers en cours") +
-      "<br>" + (isAr() ? "رُصدت خلال 6 ساعات" : "vus dans les 6 dernières heures") + "</span></div>" +
-    '<div class="stat ' + (brandNew.length ? "warn" : "") + '"><b>' + n(brandNew.length) + "</b>" +
-      "<span>" + (isAr() ? "اندلعت حديثًا" : "nouveaux départs") +
-      "<br>" + (isAr() ? "لم تكن موجودة سابقًا" : "absents du relevé précédent") + "</span></div>" +
-    '<div class="stat danger"><b>' + nInt(pop5) + "</b>" +
-      "<span>" + L.people + "<br>" + L.within5 + " " + L.atRisk + "</span></div>" +
-    (worst
-      ? '<div class="stat"><b style="color:' + CLASS_COLORS[worst.cls] + '">' + wilayaName(worst.p) + "</b>" +
-        "<span>" + (isAr() ? "أعلى خطر اليوم" : "danger le plus élevé") +
-        "<br>FWI " + n(worst.fwi.toFixed(0)) + " · " + L.cls[worst.cls] + "</span></div>"
-      : "");
-
-  document.getElementById("liveStamp").textContent =
-    new Date(FIRES.generated_at).toLocaleString(L.locale,
-      { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
-  // The largest fires still burning, with who is near them.
-  const hot = active
-    .map((f) => ({ f, e: expoById[f.id] }))
-    .sort((a, b) => b.f.frp_total - a.f.frp_total)
-    .slice(0, 4);
-
-  const wname = (code) => {
-    const g = GEO && GEO.features.find((x) => x.properties.code === code);
-    return g ? wilayaName(g.properties) : "—";
-  };
-
-  document.getElementById("liveHot").innerHTML = !hot.length ? "" :
-    '<div class="hotlist">' + hot.map(({ f, e }) => {
-      const near = e ? e.rings.r5.nearest.slice(0, 2).map((p) => p.name).filter(Boolean).join("، ") : "";
-      const st = e && e.station;
-      return '<a class="hotrow" href="wilaya.html?code=' + (f.wilaya || "") + '">' +
-        '<span class="hotdot"></span>' +
-        '<span class="hotmain"><b>' + wname(f.wilaya) + "</b>" +
-          (near ? "<span>" + near + "</span>" : "") + "</span>" +
-        '<span class="hotnum">' + n(Math.round(f.frp_total)) + " MW" +
-          "<small>" + (isAr() ? "مشتعلة منذ " : "en cours depuis ") +
-          n(Math.round(f.burning_hours)) + (isAr() ? " سا" : " h") + "</small></span>" +
-        (st && st.route
-          ? '<span class="hotnum"><b style="color:var(--ember)">' + n(st.route.min) + " " + L.min +
-            "</b><small>" + L.nearestStation + "</small></span>"
-          : "") +
-        (f.is_new ? '<span class="pill grow">' + (isAr() ? "جديدة" : "nouveau") + "</span>" : "") +
-      "</a>";
-    }).join("") + "</div>";
+    '<div class="tnear-h">' +
+      (isAr() ? "آخر عمليات الرصد" : "Dernières détections") + "</div>" +
+    f.points.slice(0, 6).map((p) => {
+      const sat = p.sat.replace(/_NRT$/, "").replace(/_/g, " ");
+      return '<div class="detrow">' +
+        "<b>" + sat + "</b>" +
+        "<span>" + (isAr() ? "قبل " + n(p.age_h.toFixed(1)) + " سا"
+                           : "il y a " + n(p.age_h.toFixed(1)) + " h") + "</span>" +
+        "<i>" + n(p.frp.toFixed(1)) + " MW · " +
+          n((p.scan * 1000).toFixed(0)) + (isAr() ? " م" : " m") + "</i>" +
+      "</div>";
+    }).join("") +
+    '<p class="detnote">' + (isAr()
+      ? "كل مستطيل هو بكسل واحد من المستشعر، مرسوم بحجمه الحقيقي على الأرض."
+      : "Chaque rectangle est un pixel du capteur, à sa taille réelle au sol.") +
+    "</p>";
 }
 
-/* Relief figures only exist when the API is up. On a static deployment this
-   block simply never renders, rather than showing zeros that look like
-   "nobody needs anything". */
-function renderRelief(r) {
-  if (!r) return;
-  const host = document.getElementById("liveHot");
-  host.insertAdjacentHTML("beforebegin",
-    '<div class="grid4" style="margin-top:10px">' +
-      '<div class="stat ' + (r.needs_critical ? "danger" : "") + '"><b>' + n(r.needs_critical) + "</b>" +
-        "<span>" + (isAr() ? "حاجة حرجة مفتوحة" : "besoins critiques") + "</span></div>" +
-      '<div class="stat warn"><b>' + n(r.needs_open) + "</b><span>" +
-        (isAr() ? "حاجة مفتوحة" : "besoins ouverts") + "</span></div>" +
-      '<div class="stat"><b>' + n(r.shelters) + "</b><span>" +
-        (isAr() ? "مركز إيواء مدرَج" : "centres listés") + "</span></div>" +
-      '<div class="stat good"><b>' + n(r.offers_open) + "</b><span>" +
-        (isAr() ? "عرض مساعدة" : "offres d'aide") + "</span></div>" +
-    "</div>");
+let pixelsOn = false;
+
+document.getElementById("tInspect").addEventListener("click", () => {
+  if (!SELECTED) return;
+  stopTour(); onTourEnd();
+  if (!pixelsOn) togglePixels();
+  inspectFire(SELECTED);
+});
+
+document.getElementById("tPixels").addEventListener("click", togglePixels);
+
+function togglePixels() {
+  if (!SELECTED) return;
+  pixelsOn = !pixelsOn;
+  if (pixelsOn) showDetections(SELECTED);
+  else clearDetections();
+  renderTargetActions();
 }
 
-function redraw() { renderCards(); renderLive(); }
+function hideTarget() {
+  document.getElementById("target").hidden = true;
+  clearDetections();
+  pixelsOn = false;
+  SELECTED = null;
+}
+
+document.getElementById("targetClose").addEventListener("click", hideTarget);
+
+/* ─── guided tour ─────────────────────────────────────────────────── */
+
+function toggleTour() {
+  if (tourRunning()) { stopTour(); onTourEnd(); return; }
+
+  const list = inWindow(winH).slice()
+    .sort((a, b) => b.frp_total - a.frp_total).slice(0, 8);
+  if (!list.length) return;
+
+  startTour(list, (f, i, total) => {
+    showTarget(f);
+    document.getElementById("tourBar").hidden = false;
+    document.getElementById("tourText").textContent =
+      (isAr() ? "جولة " : "Survol ") + n(i) + "/" + n(total) + " · " + wname(f.wilaya);
+  }, onTourEnd);
+  renderChrome();
+}
+
+function onTourEnd() {
+  document.getElementById("tourBar").hidden = true;
+  renderChrome();
+}
+
+document.getElementById("tourStop").addEventListener("click", () => {
+  stopTour(); onTourEnd();
+});
+
+/* ─── keyboard ────────────────────────────────────────────────────── */
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.matches("input, textarea")) return;
+  const k = ev.key.toLowerCase();
+  if (ev.code === "Space") { ev.preventDefault(); toggleTour(); }
+  else if (k === "h") { stopTour(); onTourEnd(); flyHome(); }
+  else if (k === "f") toggleLayer("fires");
+  else if (k === "d") toggleLayer("danger");
+  else if (k === "escape") { stopTour(); onTourEnd(); hideTarget(); }
+  else if (["1", "2", "3", "4"].indexOf(k) >= 0) setWindow(WINDOWS[+k - 1]);
+});
+
+/* ─── live refresh ────────────────────────────────────────────────── */
+
+/* The payloads are regenerated server-side on a schedule. A tab left open on a
+   wall screen should pick that up on its own rather than showing yesterday's
+   fires until somebody presses reload — which is exactly the failure mode a
+   monitoring tool cannot have. */
+const POLL_MS = 5 * 60 * 1000;
+
+async function refresh() {
+  try {
+    const [risk, fires] = await Promise.all([loadRisk(), loadFires()]);
+    const changed = !FIRES || fires.generated_at !== FIRES.generated_at;
+    RISK = risk;
+    FIRES = fires;
+
+    if (changed) {
+      try {
+        EXPO = await loadExposure();
+        EXPO_BY_ID = {};
+        EXPO.fires.forEach((e) => { EXPO_BY_ID[e.id] = e; });
+      } catch (e) { /* exposure is an enrichment, not a requirement */ }
+
+      // A window that has gone empty since the last poll would leave the globe
+      // blank, so fall back to the tightest one that still holds something.
+      if (!inWindow(winH).length) winH = defaultWindow();
+      addFires(FIRES.fires, winH);
+      setFiresVisible(show.fires);
+      flashUpdated();
+    }
+    redraw();
+  } catch (e) {
+    /* A failed poll is not worth disturbing the display over; the age on the
+       badge will visibly grow and the next poll will try again. */
+    console.warn("refresh failed:", e.message);
+  }
+}
+
+function flashUpdated() {
+  const b = document.getElementById("srcBadge");
+  b.classList.add("pulse");
+  setTimeout(() => b.classList.remove("pulse"), 2400);
+}
+
+/* ─── boot ────────────────────────────────────────────────────────── */
+
+function boot(msg) { document.getElementById("bootText").textContent = msg; }
+
+function redraw() {
+  renderChrome();
+  renderImagery();
+  stamp();
+  renderRail();
+  renderSatRail();
+  if (SELECTED) renderTargetActions();
+}
+
+(function () {
+  applyDir();
+  onLangChange(redraw);
+  document.querySelectorAll(".hud-lang").forEach((b) =>
+    b.addEventListener("click", () => setPageLang(b.dataset.lang)));
+})();
 
 (async function () {
-  initPage({ redraw });
-  redraw();
+  boot(isAr() ? "جارٍ تجهيز المجسّم…" : "Préparation du globe…");
 
-  // First visit only: explain what this is before showing them a map of fires.
-  maybeShowWelcome(LANG, (l) => setPageLang(l));
   try {
-    [FIRES, GEO, RISK] = await Promise.all([loadFires(), loadWilayaGeo(), loadRisk()]);
-    renderLive();
-    try {
-      const sum = await fetch("/api/v1/summary").then((r) => r.json());
-      renderRelief(sum.relief);
-    } catch (e) { /* static hosting has no API; the fire panel still works */ }
-    try { EXPO = await loadExposure(); renderLive(); } catch (e) { /* optional */ }
+    await buildViewer("cesium");
   } catch (err) {
-    document.getElementById("liveStats").innerHTML =
-      '<div class="notice danger">' + err.message + "</div>";
+    document.getElementById("boot").innerHTML =
+      '<div class="boot-err">' + (isAr()
+        ? "تعذّر تشغيل العرض ثلاثي الأبعاد على هذا الجهاز. "
+        : "Impossible de démarrer la vue 3D sur cet appareil. ") +
+      '<a href="fires.html">' + (isAr() ? "افتح قائمة البؤر بدل ذلك" : "Ouvrir la liste des foyers") +
+      "</a></div>";
+    return;
   }
+
+  boot(isAr() ? "جارٍ تحميل البيانات…" : "Chargement des données…");
+  [GEO, RISK, FIRES] = await Promise.all([loadWilayaGeo(), loadRisk(), loadFires()]);
+  try {
+    EXPO = await loadExposure();
+    EXPO.fires.forEach((e) => { EXPO_BY_ID[e.id] = e; });
+  } catch (e) { /* exposure is an enrichment, not a requirement */ }
+
+  boot(isAr() ? "رسم طبقة الخطر…" : "Rendu de la couche de danger…");
+  await addDangerLayer(dataURL("wilayas.geojson"), RISK.wilayas, CLASS_COLORS,
+    (fuel) => ({ forest: 0.34, steppe: 0.20, desert: 0.05 }[fuel] ?? 0.05));
+
+  winH = defaultWindow();
+  addFires(FIRES.fires, winH);
+  onFirePick((f) => { if (f) { stopTour(); onTourEnd(); showTarget(f); flyToFire(f); } });
+
+  /* Orbits are computed locally, so this costs one small file and no ongoing
+     network at all. If it fails the rest of the globe is unaffected. */
+  boot(isAr() ? "حساب مدارات الأقمار…" : "Calcul des orbites…");
+  try {
+    await loadSatellites();
+    addSatellites();
+    setSatellitesVisible(show.sats);
+    startSatelliteClock(renderSatRail);
+  } catch (e) {
+    console.warn("satellite tracking unavailable:", e.message);
+  }
+
+  redraw();
+  document.getElementById("boot").classList.add("gone");
+
+  // The opening shot runs once the data is on the globe, so the country
+  // arrives already carrying its fires rather than filling in afterwards.
+  cinematicIntro();
+
+  setInterval(refresh, POLL_MS);
+  setInterval(stamp, 30000);      // let the age on the badge tick up
 })();
 </script>
 </body>

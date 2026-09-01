@@ -1,0 +1,57 @@
+{
+ "generated_at": "2026-09-01T11:34:14+00:00",
+ "source": "celestrak",
+ "note": "Two-line element sets stay usable for roughly a week; refreshed on the same schedule as the fire data.",
+ "satellites": [
+  {
+   "name": "SUOMI NPP",
+   "short": "Suomi NPP",
+   "sensor": "VIIRS",
+   "name_ar": "سومي إن بي بي",
+   "name_fr": "Suomi NPP",
+   "swath_km": 3060,
+   "tle1": "1 37849U 11061A   26244.25368227  .00000038  00000+0  39058-4 0  9992",
+   "tle2": "2 37849  98.7984 184.6200 0002800  98.1803 261.9691 14.19530775769231"
+  },
+  {
+   "name": "NOAA 20 (JPSS-1)",
+   "short": "NOAA-20",
+   "sensor": "VIIRS",
+   "name_ar": "نوا-20",
+   "name_fr": "NOAA-20",
+   "swath_km": 3060,
+   "tle1": "1 43013U 17073A   26244.19677787  .00000024  00000+0  32378-4 0  9991",
+   "tle2": "2 43013  98.7797 182.9922 0001883  66.3759 293.7614 14.19523731455258"
+  },
+  {
+   "name": "NOAA 21 (JPSS-2)",
+   "short": "NOAA-21",
+   "sensor": "VIIRS",
+   "name_ar": "نوا-21",
+   "name_fr": "NOAA-21",
+   "swath_km": 3060,
+   "tle1": "1 54234U 22150A   26244.22830828  .00000037  00000+0  38244-4 0  9993",
+   "tle2": "2 54234  98.7081 181.7451 0001850  16.2184 343.9052 14.19547525197338"
+  },
+  {
+   "name": "TERRA",
+   "short": "Terra",
+   "sensor": "MODIS",
+   "name_ar": "تيرا",
+   "name_fr": "Terra",
+   "swath_km": 2330,
+   "tle1": "1 25994U 99068A   26244.23967690  .00000213  00000+0  52300-4 0  9990",
+   "tle2": "2 25994  97.9391 290.7465 0002391  25.6136  49.3665 14.61152912420719"
+  },
+  {
+   "name": "AQUA",
+   "short": "Aqua",
+   "sensor": "MODIS",
+   "name_ar": "أكوا",
+   "name_fr": "Aqua",
+   "swath_km": 2330,
+   "tle1": "1 27424U 02022A   26244.29597450  .00000508  00000+0  11086-3 0  9995",
+   "tle2": "2 27424  98.4364 215.1312 0001778  77.8920  27.3727 14.62186188294396"
+  }
+ ]
+}
