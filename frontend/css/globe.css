@@ -416,3 +416,41 @@ html[dir="rtl"] .hud-rail { --rx: 18px; }
   50% { transform: scale(1.9); opacity: .45; }
 }
 .rr-num.live { color: var(--g-cool); font-weight: 600; }
+
+/* --- burned area ------------------------------------------------------- */
+.burn-block { border-color: rgba(245,133,47,.26); }
+.burn-total {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 11px;
+}
+.burn-total b {
+  font-size: 27px; font-weight: 600; line-height: 1; color: #F5852F;
+  font-variant-numeric: tabular-nums;
+}
+.burn-total span { font-size: 11px; color: var(--g-dim); }
+
+.burn-row {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 9px; margin-bottom: 3px; cursor: pointer;
+  font: inherit; text-align: start; color: var(--g-txt);
+  background: none; border: 0; border-radius: 7px; overflow: hidden;
+}
+/* The bar is the row's background, not a separate element beside it: the
+   ranking should be readable at a glance without reading a single number. */
+.br-bar {
+  position: absolute; inset-block: 0; inset-inline-start: 0; z-index: 0;
+  background: linear-gradient(to right, rgba(245,133,47,.30), rgba(245,133,47,.10));
+  border-radius: 7px;
+}
+html[dir="rtl"] .br-bar {
+  background: linear-gradient(to left, rgba(245,133,47,.30), rgba(245,133,47,.10));
+}
+.burn-row:hover .br-bar { filter: brightness(1.45); }
+.br-name { position: relative; z-index: 1; flex: 1; font-size: 12px; font-weight: 500; }
+.br-ha {
+  position: relative; z-index: 1; font-size: 13px; font-weight: 600;
+  color: #F5A05C; font-variant-numeric: tabular-nums;
+}
+.br-ha i {
+  font-style: normal; font-size: 9px; color: var(--g-faint);
+  margin-inline-start: 3px; font-weight: 400;
+}

@@ -564,3 +564,93 @@ function inspectFire(f, onArrive) {
     complete: onArrive,
   });
 }
+
+/* ─── burned area ─────────────────────────────────────────────────────────
+   What each wilaya actually lost, shaded onto the map.
+
+   The fire markers answer "where is it burning". This answers "what is gone",
+   which is the question that survives the fire — the one people are still
+   asking a week later when the hotspots have cleared and the coverage has
+   moved on. It is computed from the footprint of every detection, deduplicated
+   onto a 375 m grid, so it is a floor rather than an estimate: ground a
+   satellite positively saw burning.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Sequential scale, dark to bright. Deliberately not the danger palette: the
+   two layers mean different things and must never be read as the same scale. */
+const BURN_STOPS = [
+  { ha:     0, c: "#000000", a: 0.00 },
+  { ha:   200, c: "#4A1D14", a: 0.30 },
+  { ha:  1000, c: "#7B2A16", a: 0.42 },
+  { ha:  4000, c: "#A83A18", a: 0.54 },
+  { ha: 10000, c: "#D2551C", a: 0.64 },
+  { ha: 20000, c: "#F5852F", a: 0.74 },
+];
+
+function burnStyle(ha) {
+  let s = BURN_STOPS[0];
+  for (const stop of BURN_STOPS) if (ha >= stop.ha) s = stop;
+  return s;
+}
+
+let burnedSource = null;
+
+async function addBurnedLayer(geojson, burnedByCode, windowKey) {
+  if (burnedSource) {
+    await viewer.dataSources.remove(burnedSource, true);
+    burnedSource = null;
+  }
+  const ds = await Cesium.GeoJsonDataSource.load(geojson, { clampToGround: true });
+
+  for (const entity of ds.entities.values) {
+    if (!entity.polygon) continue;
+    const code = entity.properties && entity.properties.code
+      ? entity.properties.code.getValue() : null;
+    const rec = code ? burnedByCode[code] : null;
+    const ha = rec ? (rec[windowKey] || 0) : 0;
+
+    if (ha <= 0) {
+      entity.polygon.material = Cesium.Color.TRANSPARENT;
+      entity.polygon.outline = false;
+      continue;
+    }
+    const s = burnStyle(ha);
+    entity.polygon.material =
+      Cesium.Color.fromCssColorString(s.c).withAlpha(s.a);
+    // An outline here, unlike on the danger layer: a burn scar has a hard
+    // administrative edge in this rendering and pretending otherwise invites
+    // reading the shading as a smooth field.
+    entity.polygon.outline = true;
+    entity.polygon.outlineColor =
+      Cesium.Color.fromCssColorString("#F5852F").withAlpha(0.5);
+    entity.polygon.classificationType = Cesium.ClassificationType.TERRAIN;
+  }
+
+  burnedSource = ds;
+  ds.show = false;
+  await viewer.dataSources.add(ds);
+  return ds;
+}
+
+function setBurnedVisible(on) {
+  if (burnedSource) burnedSource.show = on;
+}
+
+async function setBurnedWindow(geojson, burnedByCode, windowKey, visible) {
+  await addBurnedLayer(geojson, burnedByCode, windowKey);
+  setBurnedVisible(visible);
+}
+
+/* Frame a whole wilaya — used when someone picks one off the damage list and
+   wants to see the extent of it rather than a single hotspot. */
+function flyToWilaya(feature) {
+  if (!viewer || !feature) return;
+  bumpIdle();
+  const b = feature.properties.bbox;
+  if (!b) return;
+  viewer.camera.flyTo({
+    destination: Cesium.Rectangle.fromDegrees(b[0], b[1], b[2], b[3]),
+    duration: 2.2,
+    easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
+  });
+}

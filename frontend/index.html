@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link href="https://unpkg.com/cesium@1.144.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-<link href="css/globe.css?v=13" rel="stylesheet">
+<link href="css/globe.css?v=14" rel="stylesheet">
 </head>
 <body class="globe-body">
 
@@ -52,6 +52,14 @@
     <div class="rail-h" id="hFires"></div>
     <div class="win-chips" id="winChips"></div>
     <div class="rail-list" id="fireList"></div>
+  </div>
+
+  <div class="rail-block burn-block">
+    <div class="rail-h" id="hBurn"></div>
+    <div class="burn-total" id="burnTotal"></div>
+    <div class="win-chips" id="burnChips"></div>
+    <div class="rail-list" id="burnList"></div>
+    <p class="rail-foot" id="burnFoot"></p>
   </div>
 
   <div class="rail-block">
@@ -121,14 +129,15 @@
 <!-- SGP4 orbit propagation, so the satellites are computed live in the browser
      rather than polled from anywhere. -->
 <script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
-<script src="js/config.js?v=13"></script>
-<script src="js/i18n.js?v=13"></script>
-<script src="js/common.js?v=13"></script>
-<script src="js/globe.js?v=13"></script>
-<script src="js/satellites.js?v=13"></script>
+<script src="js/config.js?v=14"></script>
+<script src="js/i18n.js?v=14"></script>
+<script src="js/common.js?v=14"></script>
+<script src="js/globe.js?v=14"></script>
+<script src="js/satellites.js?v=14"></script>
 <script>
 let RISK = null, FIRES = null, EXPO = null, GEO = null, EXPO_BY_ID = {};
-let show = { fires: true, danger: true, sats: true };
+let BURNED = null;
+let show = { fires: true, danger: true, sats: true, burned: false };
 let SELECTED = null;
 
 /* How far back the globe looks. Six hours is "burning now" — that is the
@@ -185,6 +194,7 @@ function renderChrome() {
     { k: "fires",  ar: "البؤر", fr: "Foyers" },
     { k: "danger", ar: "طبقة الخطر", fr: "Couche de danger" },
     { k: "sats",   ar: "الأقمار", fr: "Satellites" },
+    { k: "burned", ar: "المحترق", fr: "Brûlé" },
   ].map((t) =>
     '<button class="tgl' + (show[t.k] ? " on" : "") + '" data-k="' + t.k + '">' +
     (isAr() ? t.ar : t.fr) + "</button>").join("") +
@@ -205,7 +215,102 @@ function toggleLayer(k) {
   if (k === "fires") setFiresVisible(show.fires);
   if (k === "danger") setDangerVisible(show.danger);
   if (k === "sats") setSatellitesVisible(show.sats);
+  if (k === "burned") {
+    setBurnedVisible(show.burned);
+    // The two shaded layers cannot both be on: one is forecast danger, the
+    // other is realised damage, and stacked they read as a single meaningless
+    // colour field.
+    if (show.burned && show.danger) { show.danger = false; setDangerVisible(false); }
+  }
+  if (k === "danger" && show.danger && show.burned) {
+    show.burned = false; setBurnedVisible(false);
+  }
   renderChrome();
+}
+
+/* ─── burned area ─────────────────────────────────────────────────── */
+
+/* The damage panel. This is the part of the page that answers the question
+   people actually carry away from a fire season — not where it is burning
+   tonight, but what the country lost this week. */
+const BURN_WINDOWS = [24, 48, 120];
+let burnWin = 120;
+
+const burnKey = () => "ha_" + burnWin + "h";
+
+function burnWindowLabel(h) {
+  if (h < 48) return isAr() ? "24 ساعة" : "24 h";
+  if (h < 120) return isAr() ? "يومان" : "2 j";
+  return isAr() ? "5 أيام" : "5 j";
+}
+
+function haText(ha) {
+  // Below a thousand hectares the exact figure is meaningful; above it, the
+  // precision is false and the magnitude is the point.
+  if (ha >= 1000) return nInt(Math.round(ha / 100) * 100);
+  return nInt(ha);
+}
+
+function renderBurn() {
+  if (!BURNED) return;
+
+  document.getElementById("hBurn").textContent =
+    isAr() ? "المساحات المحترقة" : "Surfaces brûlées";
+
+  const total = BURNED.totals[burnKey()] || 0;
+  document.getElementById("burnTotal").innerHTML =
+    "<b>" + haText(total) + "</b><span>" +
+    (isAr() ? "هكتار خلال " + burnWindowLabel(burnWin)
+            : "hectares en " + burnWindowLabel(burnWin)) + "</span>";
+
+  document.getElementById("burnChips").innerHTML = BURN_WINDOWS.map((h) =>
+    '<button class="wchip' + (h === burnWin ? " on" : "") + '" data-burn="' + h + '">' +
+    burnWindowLabel(h) + "<i>" + haText(BURNED.totals["ha_" + h + "h"] || 0) +
+    "</i></button>").join("");
+
+  document.querySelectorAll("[data-burn]").forEach((b) =>
+    b.addEventListener("click", () => setBurnWindow(+b.dataset.burn)));
+
+  const rows = Object.values(BURNED.wilayas)
+    .filter((w) => (w[burnKey()] || 0) > 0)
+    .sort((a, b) => (b[burnKey()] || 0) - (a[burnKey()] || 0))
+    .slice(0, 8);
+
+  const max = rows.length ? rows[0][burnKey()] : 1;
+
+  document.getElementById("burnList").innerHTML = !rows.length
+    ? '<p class="rail-none">' +
+        (isAr() ? "لا مساحات محترقة مسجّلة." : "Aucune surface brûlée relevée.") + "</p>"
+    : rows.map((w) => {
+        const ha = w[burnKey()] || 0;
+        const pct = Math.max(3, Math.round((ha / max) * 100));
+        return '<button class="burn-row" data-wburn="' + w.code + '">' +
+          '<span class="br-bar" style="width:' + pct + '%"></span>' +
+          '<span class="br-name">' + (isAr() ? w.name_ar : w.name_fr) + "</span>" +
+          '<span class="br-ha">' + haText(ha) +
+            "<i>" + (isAr() ? "هكتار" : "ha") + "</i></span>" +
+        "</button>";
+      }).join("");
+
+  document.querySelectorAll("[data-wburn]").forEach((b) =>
+    b.addEventListener("click", () => {
+      stopTour(); onTourEnd();
+      if (!show.burned) toggleLayer("burned");
+      const feat = GEO.features.find((f) => f.properties.code === b.dataset.wburn);
+      if (feat) flyToWilaya(feat);
+    }));
+
+  /* Say what the number is. An area figure with no method behind it invites
+     being quoted as an official damage assessment, which this is not. */
+  document.getElementById("burnFoot").textContent = isAr()
+    ? "أرض رآها القمر تحترق فعلًا — حدّ أدنى، لا حصيلة رسمية. الحرائق التي تندلع وتنطفئ بين مرورين لا تُحتسب."
+    : "Sol vu en feu par satellite — un minimum, pas un bilan officiel. Les feux nés et éteints entre deux passages ne comptent pas.";
+}
+
+async function setBurnWindow(h) {
+  burnWin = h;
+  await setBurnedWindow(dataURL("wilayas.geojson"), BURNED.wilayas, burnKey(), show.burned);
+  renderBurn();
 }
 
 /* ─── satellites ──────────────────────────────────────────────────── */
@@ -626,6 +731,11 @@ async function refresh() {
         EXPO_BY_ID = {};
         EXPO.fires.forEach((e) => { EXPO_BY_ID[e.id] = e; });
       } catch (e) { /* exposure is an enrichment, not a requirement */ }
+      try {
+        BURNED = await getJSON(null, dataURL("burned.json"));
+        await setBurnedWindow(dataURL("wilayas.geojson"), BURNED.wilayas,
+                              burnKey(), show.burned);
+      } catch (e) { /* keep the previous damage figures */ }
 
       // A window that has gone empty since the last poll would leave the globe
       // blank, so fall back to the tightest one that still holds something.
@@ -657,6 +767,7 @@ function redraw() {
   renderImagery();
   stamp();
   renderRail();
+  renderBurn();
   renderSatRail();
   if (SELECTED) renderTargetActions();
 }
@@ -690,9 +801,18 @@ function redraw() {
     EXPO.fires.forEach((e) => { EXPO_BY_ID[e.id] = e; });
   } catch (e) { /* exposure is an enrichment, not a requirement */ }
 
+  try {
+    BURNED = await getJSON(null, dataURL("burned.json"));
+  } catch (e) { console.warn("burned-area data unavailable:", e.message); }
+
   boot(isAr() ? "رسم طبقة الخطر…" : "Rendu de la couche de danger…");
   await addDangerLayer(dataURL("wilayas.geojson"), RISK.wilayas, CLASS_COLORS,
     (fuel) => ({ forest: 0.34, steppe: 0.20, desert: 0.05 }[fuel] ?? 0.05));
+
+  if (BURNED) {
+    boot(isAr() ? "حساب المساحات المحترقة…" : "Calcul des surfaces brûlées…");
+    await addBurnedLayer(dataURL("wilayas.geojson"), BURNED.wilayas, burnKey());
+  }
 
   winH = defaultWindow();
   addFires(FIRES.fires, winH);

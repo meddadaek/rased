@@ -45,12 +45,18 @@ jobs:
             echo "::error::https://firms.modaps.eosdis.nasa.gov/api/map_key/"
             exit 1
           fi
-          python backend/app/firms.py --days 2
+          python backend/app/firms.py --days 5
 
       - name: Weather and fire-danger index
         # Open-Meteo needs no key. This is the slower of the two fetches because
         # it pulls 99 days per wilaya to spin the moisture codes up properly.
         run: python backend/pipeline.py
+
+      - name: Burned area per wilaya
+        # Derived from the detection footprints already fetched, so this costs
+        # no extra network — but it is the number people actually carry away
+        # from a fire season, so it is not optional.
+        run: python backend/burned.py
 
       - name: Orbital elements for the observing satellites
         # Cheap, keyless, and the globe propagates positions from these in the
@@ -78,6 +84,12 @@ jobs:
           print("::notice::%d vegetation fires, %d burning within %sh, %d new"
                 % (len(veg), len(active), fires.get("active_hours", 6),
                    sum(1 for f in active if f.get("is_new"))))
+          try:
+              burned = json.load(open("frontend/data/burned.json", encoding="utf-8"))
+              print("::notice::%.0f ha burned in the last 5 days"
+                    % burned["totals"]["ha_120h"])
+          except Exception:
+              pass
           PY
 
       - name: Commit refreshed payloads
